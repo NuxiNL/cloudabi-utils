@@ -1,0 +1,23 @@
+#!/bin/sh
+
+# Installation directory.
+: ${PREFIX:=/usr/local}
+
+# Host toolchain parameters.
+: ${CC:=cc}
+: ${CFLAGS:=-O2 -I${PREFIX}/include}
+: ${LDFLAGS:=-L${PREFIX}/lib}
+
+# CloudABI toolchain parameters.
+: ${CLOUDABI_CC:=x86_64-unknown-cloudabi-cc}
+: ${CLOUDABI_CFLAGS:=-O2}
+
+set -ex
+
+rm -Rf _obj
+mkdir _obj
+
+${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${CLOUDABI_LDFLAGS} \
+    -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
+${CC} ${CFLAGS} ${LDFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
+    -o _obj/cloudabi-run src/cloudabi-run/*.c

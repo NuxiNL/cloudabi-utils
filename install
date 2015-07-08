@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Installation directory.
+: ${PREFIX:=/usr/local}
+
+set -ex
+
+install -m 555 _obj/cloudabi-reexec "${PREFIX}/libexec/cloudabi-reexec"
+install -m 555 _obj/cloudabi-run "${PREFIX}/bin/cloudabi-run"
