@@ -20,10 +20,11 @@
 // its error message to file descriptor 2, stderr. This is safe, as
 // cloudabi-run also writes diagnostic messages to this file descriptor.
 
+#include <sys/uio.h>
+
 #include <argdata.h>
 #include <program.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -39,7 +40,15 @@ static bool iterate(const argdata_t *ad, void *thunk) {
   } else {
     // Second element in sequence; arguments data for the executable.
     int error = exec(fd, ad);
-    dprintf(2, "Failed to start executable: %s\n", strerror(error));
+
+    // Print error message without depending on stdio.
+    static const char prefix[] = "Failed to start executable: ";
+    struct iovec iov[3] = {
+      {.iov_base = (char *)prefix, .iov_len = sizeof(prefix) - 1},
+      {.iov_base = strerror(error), strlen(iov[1].iov_base)},
+      {.iov_base = "\n", 1},
+    };
+    writev(2, iov, __arraycount(iov));
     _Exit(127);
   }
 }
