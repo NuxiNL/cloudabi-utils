@@ -18,10 +18,26 @@ WARNFLAGS="-Werror -Werror-pointer-arith -Wall -Wsystem-headers \
 -Wstrict-prototypes -Wmissing-variable-declarations -Wthread-safety \
 -Wsign-compare -Wundef -Wno-comment"
 
-set -ex
+set -e
 
 rm -Rf _obj
 mkdir _obj
+
+if type clang-format > /dev/null; then
+  find src -name '*.[ch]' | while read srcfile; do
+    clang-format -style='{
+  BasedOnStyle: Google,
+  AllowShortIfStatementsOnASingleLine: false,
+  AllowShortLoopsOnASingleLine: false,
+  AllowShortFunctionsOnASingleLine: None,
+  DerivePointerBinding: false,
+  PointerAlignment: Right,
+}' "${srcfile}" > _obj/clang-format
+    mv _obj/clang-format "${srcfile}"
+  done
+fi
+
+set -x
 
 ${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${WARNFLAGS} ${CLOUDABI_LDFLAGS} \
     -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
