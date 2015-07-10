@@ -33,7 +33,10 @@ if type clang-format > /dev/null; then
   DerivePointerBinding: false,
   PointerAlignment: Right,
 }' "${srcfile}" > _obj/clang-format
-    mv _obj/clang-format "${srcfile}"
+    if ! cmp -s _obj/clang-format "${srcfile}"; then
+      echo "=> Style fixing ${srcfile}"
+      mv _obj/clang-format "${srcfile}"
+    fi
   done
 fi
 
