@@ -44,9 +44,9 @@ static bool iterate(const argdata_t *ad, void *thunk) {
     // Print error message without depending on stdio.
     static const char prefix[] = "Failed to start executable: ";
     struct iovec iov[3] = {
-      {.iov_base = (char *)prefix, .iov_len = sizeof(prefix) - 1},
-      {.iov_base = strerror(error), strlen(iov[1].iov_base)},
-      {.iov_base = (char *)"\n", 1},
+        {.iov_base = (char *)prefix, .iov_len = sizeof(prefix) - 1},
+        {.iov_base = strerror(error), strlen(iov[1].iov_base)},
+        {.iov_base = (char *)"\n", 1},
     };
     writev(2, iov, __arraycount(iov));
     _Exit(127);
