@@ -3,7 +3,16 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
-// cloudabi-run - ...
+// cloudabi-run - execute CloudABI programs safely
+//
+// The cloudabi-run utility can execute CloudABI programs with an exact
+// set of file descriptors. It reads a YAML configuration from stdin.
+// This data is converted to argument data (argdata_t) that can be
+// accessed from program_main().
+//
+// !fd, !file and !socket nodes in the YAML file are converted to file
+// descriptor entries in the argument data, meaning they will be
+// available within the CloudABI process.
 
 #include <sys/socket.h>
 #include <sys/stat.h>
