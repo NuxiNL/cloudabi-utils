@@ -7,12 +7,14 @@
 
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/un.h>
 
 #include <netinet/in.h>
 
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <netdb.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdnoreturn.h>
@@ -82,7 +84,7 @@ static int exec(int fd, const argdata_t *ad) {
 static void get_event(yaml_parser_t *parser, yaml_event_t *event) {
   do {
     if (!yaml_parser_parse(parser, event)) {
-      fprintf(stderr, "<stdin>:%zu:%zu: Parse error\n", parser->mark.line + 1,
+      fprintf(stderr, "stdin:%zu:%zu: Parse error\n", parser->mark.line + 1,
               parser->mark.column + 1);
       exit(127);
     }
@@ -93,7 +95,7 @@ static void get_event(yaml_parser_t *parser, yaml_event_t *event) {
 // Terminates execution due to a parse error.
 static noreturn void exit_parse_error(const yaml_event_t *event,
                                       const char *message, ...) {
-  fprintf(stderr, "<stdin>:%zu:%zu: ", event->start_mark.line + 1,
+  fprintf(stderr, "stdin:%zu:%zu: ", event->start_mark.line + 1,
           event->start_mark.column + 1);
   va_list ap;
   va_start(ap, message);
@@ -223,9 +225,10 @@ static const argdata_t *parse_seq(yaml_parser_t *parser) {
 }
 
 // Parses a socket, creates it and returns a file descriptor number.
+// TODO(ed): Add support for connecting sockets.
 static const argdata_t *parse_socket(const yaml_event_t *event,
                                      yaml_parser_t *parser) {
-  const char *domainstr = NULL, *typestr = NULL, *bindstr = NULL;
+  const char *typestr = NULL, *bindstr = NULL;
   for (;;) {
     // Fetch key name and value.
     const argdata_t *key = parse_object(parser);
@@ -237,12 +240,7 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
       exit_parse_error(event, "Bad attribute: %s", strerror(error));
     const argdata_t *value = parse_object(parser);
 
-    if (strcmp(keystr, "domain") == 0) {
-      // Socket domain: inet, inet6, etc.
-      error = argdata_get_str_c(value, &domainstr);
-      if (error != 0)
-        exit_parse_error(event, "Bad domain attribute: %s", strerror(error));
-    } else if (strcmp(keystr, "type") == 0) {
+    if (strcmp(keystr, "type") == 0) {
       // Socket type: stream, datagram, etc.
       error = argdata_get_str_c(value, &typestr);
       if (error != 0)
@@ -257,18 +255,7 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     }
   }
 
-  // Parse the domain and type and create the socket.
-  if (domainstr == NULL)
-    exit_parse_error(event, "Missing domain attribute");
-  int domain;
-  if (strcmp(domainstr, "inet") == 0)
-    domain = AF_INET;
-  else if (strcmp(domainstr, "inet6") == 0)
-    domain = AF_INET6;
-  else
-    exit_parse_error(event, "Unsupported domain attribute: %s", domainstr);
-  if (typestr == NULL)
-    exit_parse_error(event, "Missing type attribute");
+  // Parse the socket type.
   int type;
   if (strcmp(typestr, "dgram") == 0)
     type = SOCK_DGRAM;
@@ -278,26 +265,65 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     type = SOCK_STREAM;
   else
     exit_parse_error(event, "Unsupported type attribute: %s", typestr);
-  int fd = socket(domain, type, 0);
-  if (fd == -1)
-    exit_parse_error(event, "Failed to create socket: %s", strerror(errno));
 
-  // Bind socket.
-  if (bindstr == NULL)
-    exit_parse_error(event, "Missing bind attribute");
+  // Parse the bind address.
+  const struct sockaddr *sa;
+  socklen_t sal;
+  struct sockaddr_un sun;
+  struct addrinfo *res = NULL;
+  if (bindstr[0] == '/') {
+    // UNIX socket: bind to path.
+    sun.sun_family = AF_UNIX;
+    if (strlcpy(sun.sun_path, bindstr, sizeof(sun.sun_path)) >=
+        sizeof(sun.sun_path))
+      exit_parse_error(event, "Socket path %s too long", bindstr);
+    sa = (const struct sockaddr *)&sun;
+    sal = sizeof(sun);
+  } else {
+    // IPv4 or IPv6 socket. Extract address and port number.
+    const char *split, *servname;
+    if (bindstr[0] == '[') {
+      split = strstr(bindstr, "]:");
+      servname = split + 2;
+    } else {
+      split = strchr(bindstr, ':');
+      servname = split + 1;
+    }
+    if (split == NULL)
+      exit_parse_error(event, "Address %s does not contain a port number",
+                       bindstr);
+    const char *hostname = strndup(bindstr, split - bindstr);
+
+    // Resolve address and port number.
+    struct addrinfo hint = {.ai_family = AF_UNSPEC, .ai_socktype = type};
+    int error = getaddrinfo(hostname, servname, &hint, &res);
+    if (error != 0)
+      exit_parse_error(event, "Failed to resolve %s: %s", bindstr,
+                       gai_strerror(error));
+    if (res->ai_next != NULL)
+      exit_parse_error(event, "%s resolves to multiple addresses", bindstr);
+    sa = res->ai_addr;
+    sal = res->ai_addrlen;
+  }
+
+  // Create socket.
+  int fd = socket(sa->sa_family, type, 0);
+  if (fd == -1)
+    exit_parse_error(event, "Failed to create socket for %s: %s", bindstr,
+                     strerror(errno));
+
+  // Bind.
   int on = 1;
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  // TODO(ed): Properly parse the address instead of hardcoding something.
-  struct sockaddr_in sin = {
-    .sin_family = AF_INET,
-    .sin_addr.s_addr = INADDR_ANY,
-    .sin_port = htons(12345)
-  };
-  if (bind(fd, (const struct sockaddr *)&sin, sizeof(sin)) == -1)
-    exit_parse_error(event, "Failed to bind socket: %s", strerror(errno));
+  if (bind(fd, sa, sal) == -1)
+    exit_parse_error(event, "Failed to bind to %s: %s", bindstr,
+                     strerror(errno));
   if (listen(fd, 0) == -1)
-    exit_parse_error(event, "Failed to listen on socket: %s", strerror(errno));
+    exit_parse_error(event, "Failed to listen on %s: %s", bindstr,
+                     strerror(errno));
 
+  if (res != NULL)
+    freeaddrinfo(res);
   return argdata_create_fd(fd);
 }
 
