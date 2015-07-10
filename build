@@ -12,12 +12,18 @@
 : ${CLOUDABI_CC:=x86_64-unknown-cloudabi-cc}
 : ${CLOUDABI_CFLAGS:=-O2}
 
+WARNFLAGS="-Werror -Werror-pointer-arith -Wall -Wsystem-headers \
+-Wold-style-definition -Wreturn-type -Wwrite-strings -Wswitch \
+-Wchar-subscripts -Wnested-externs -Wshadow -Wmissing-prototypes \
+-Wstrict-prototypes -Wmissing-variable-declarations -Wthread-safety \
+-Wsign-compare -Wundef -Wno-comment"
+
 set -ex
 
 rm -Rf _obj
 mkdir _obj
 
-${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${CLOUDABI_LDFLAGS} \
+${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${WARNFLAGS} ${CLOUDABI_LDFLAGS} \
     -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
-${CC} ${CFLAGS} ${LDFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
+${CC} ${CFLAGS} ${LDFLAGS} ${WARNFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
     -o _obj/cloudabi-run src/cloudabi-run/*.c
