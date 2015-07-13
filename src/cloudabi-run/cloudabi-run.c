@@ -370,7 +370,7 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
   if (bind(fd, sa, sal) == -1)
     exit_parse_error(event, "Failed to bind to %s: %s", bindstr,
                      strerror(errno));
-  if (listen(fd, 0) == -1)
+  if (listen(fd, 0) == -1 && errno != EOPNOTSUPP)
     exit_parse_error(event, "Failed to listen on %s: %s", bindstr,
                      strerror(errno));
 
