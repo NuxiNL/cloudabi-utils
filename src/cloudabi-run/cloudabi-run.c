@@ -197,12 +197,24 @@ static const argdata_t *parse_int(yaml_event_t *event) {
   const char *value = (const char *)event->data.scalar.value;
   const char *value_end = value + event->data.scalar.length;
 
+  // Determine the base of the number.
+  int base;
+  if (value[0] == '0' && value[1] == 'o') {
+    value += 2;
+    base = 8;
+  } else if (value[0] == '0' && value[1] == 'x') {
+    value += 2;
+    base = 16;
+  } else {
+    base = 10;
+  }
+
   // Try signed integer conversion.
   {
     intmax_t intval;
     char *endptr;
     errno = 0;
-    intval = strtoimax(value, &endptr, 10);
+    intval = strtoimax(value, &endptr, base);
     if (errno == 0 && endptr == value_end)
       return argdata_create_int(intval);
   }
@@ -212,7 +224,7 @@ static const argdata_t *parse_int(yaml_event_t *event) {
     uintmax_t uintval;
     char *endptr;
     errno = 0;
-    uintval = strtoumax(value, &endptr, 10);
+    uintval = strtoumax(value, &endptr, base);
     if (errno == 0 && endptr == value_end)
       return argdata_create_int(uintval);
   }
