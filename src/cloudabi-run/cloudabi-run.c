@@ -36,6 +36,10 @@
 
 #define TAG_PREFIX "tag:nuxi.nl,2015:cloudabi/"
 
+#ifndef O_EXEC
+#define O_EXEC O_RDONLY
+#endif
+
 static const argdata_t *parse_object(yaml_parser_t *parser);
 
 // Emulation of the cloudlibc exec() function outside of CloudABI.
@@ -325,8 +329,8 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
   if (bindstr[0] == '/') {
     // UNIX socket: bind to path.
     sun.sun_family = AF_UNIX;
-    if (strlcpy(sun.sun_path, bindstr, sizeof(sun.sun_path)) >=
-        sizeof(sun.sun_path))
+    strncpy(sun.sun_path, bindstr, sizeof(sun.sun_path));
+    if (sun.sun_path[sizeof(sun.sun_path) - 1] != '\0')
       exit_parse_error(event, "Socket path %s too long", bindstr);
     sa = (const struct sockaddr *)&sun;
     sal = sizeof(sun);
