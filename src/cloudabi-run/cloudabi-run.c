@@ -343,11 +343,12 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     if (split == NULL)
       exit_parse_error(event, "Address %s does not contain a port number",
                        bindstr);
-    const char *hostname = strndup(bindstr, split - bindstr);
 
     // Resolve address and port number.
+    char *hostname = strndup(bindstr, split - bindstr);
     struct addrinfo hint = {.ai_family = AF_UNSPEC, .ai_socktype = type};
     int error = getaddrinfo(hostname, servname, &hint, &res);
+    free(hostname);
     if (error != 0)
       exit_parse_error(event, "Failed to resolve %s: %s", bindstr,
                        gai_strerror(error));
