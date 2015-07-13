@@ -180,14 +180,15 @@ $ cat webserver.c
 
 void program_main(const argdata_t *ad) {
   int sockfd;
-  argdata_get_fd(ad, &sockfd);
-  int connfd;
-  while ((connfd = accept(sockfd, NULL, NULL)) >= 0) {
-    const char buf[] = "HTTP/1.1 200 OK\\r\\n"
-                       "Content-Type: text/plain\\r\\n\\r\\n"
-                       "Hello, world\\n";
-    write(connfd, buf, sizeof(buf) - 1);
-    close(connfd);
+  if (argdata_get_fd(ad, &sockfd) == 0) {
+    int connfd;
+    while ((connfd = accept(sockfd, NULL, NULL)) >= 0) {
+      const char buf[] = "HTTP/1.1 200 OK\\r\\n"
+                         "Content-Type: text/plain\\r\\n\\r\\n"
+                         "Hello, world\\n";
+      write(connfd, buf, sizeof(buf) - 1);
+      close(connfd);
+    }
   }
   exit(1);
 }
