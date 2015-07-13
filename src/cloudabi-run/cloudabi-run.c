@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <netdb.h>
 #include <stdarg.h>
@@ -189,6 +190,35 @@ static const argdata_t *parse_file(const yaml_event_t *event,
   if (fd < 0)
     exit_parse_error(event, "Failed to open \"%s\": %s", path, strerror(errno));
   return argdata_create_fd(fd);
+}
+
+// Parses an integer value.
+static const argdata_t *parse_int(yaml_event_t *event) {
+  const char *value = (const char *)event->data.scalar.value;
+  const char *value_end = value + event->data.scalar.length;
+
+  // Try signed integer conversion.
+  {
+    intmax_t intval;
+    char *endptr;
+    errno = 0;
+    intval = strtoimax(value, &endptr, 10);
+    if (errno == 0 && endptr == value_end)
+      return argdata_create_int(intval);
+  }
+
+  // Try unsigned integer conversion.
+  {
+    uintmax_t uintval;
+    char *endptr;
+    errno = 0;
+    uintval = strtoumax(value, &endptr, 10);
+    if (errno == 0 && endptr == value_end)
+      return argdata_create_int(uintval);
+  }
+
+  // Integer value out of bounds.
+  exit_parse_error(event, "Invalid integer value");
 }
 
 // Parses a map.
@@ -364,6 +394,8 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
                                   event.data.scalar.length);
       } else if (strcmp(tag, YAML_BOOL_TAG) == 0) {
         return parse_bool(&event);
+      } else if (strcmp(tag, YAML_INT_TAG) == 0) {
+        return parse_int(&event);
       } else if (strcmp(tag, YAML_NULL_TAG) == 0) {
         return parse_null(&event);
       } else if (strcmp(tag, TAG_PREFIX "fd") == 0) {
