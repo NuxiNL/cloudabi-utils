@@ -145,15 +145,15 @@ static const argdata_t *parse_fd(yaml_event_t *event) {
     if (errno != 0 || endptr != value + event->data.scalar.length ||
         fd > INT_MAX)
       exit_parse_error(event, "Invalid file descriptor number");
-
-    // Validate that this descriptor actually exists. exec() does not
-    // return which file descriptors are invalid, so we'd better check
-    // this manually over here.
-    struct stat sb;
-    if (fstat(fd, &sb) != 0)
-      exit_parse_error(event, "File descriptor %d: %s", fd, strerror(errno));
-    yaml_event_delete(event);
   }
+
+  // Validate that this descriptor actually exists. exec() does not
+  // return which file descriptors are invalid, so we'd better check
+  // this manually over here.
+  struct stat sb;
+  if (fstat(fd, &sb) != 0)
+    exit_parse_error(event, "File descriptor %d: %s", fd, strerror(errno));
+  yaml_event_delete(event);
   return argdata_create_fd(fd);
 }
 
