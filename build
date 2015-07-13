@@ -46,3 +46,4 @@ ${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${WARNFLAGS} ${CLOUDABI_LDFLAGS} \
     -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
 ${CC} ${CFLAGS} ${LDFLAGS} ${WARNFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
     -o _obj/cloudabi-run src/cloudabi-run/*.c
+gzip -9nc src/cloudabi-run/cloudabi-run.1 > _obj/cloudabi-run.1.gz

@@ -1,0 +1,228 @@
+.\" Copyright (c) 2015 Nuxi, https://nuxi.nl/
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.Dd July 13, 2015
+.Dt CLOUDABI-RUN 1
+.Os
+.Sh NAME
+.Nm cloudabi-run
+.Nd "execute CloudABI processes"
+.Sh SYNOPSIS
+.Nm
+.Ar path
+.Sh DESCRIPTION
+CloudABI is a purely capability-based runtime environment,
+meaning that access to system resources is solely based on the set of
+file descriptor that the process possesses.
+For example,
+CloudABI processes can only access a file if it possesses a file
+descriptor for that file or one of its parent directories.
+This makes it critical that a CloudABI process is provided the right set
+of file descriptors on startup.
+.Pp
+The problem with providing a set of file descriptors on startup is that
+the file descriptors either need to be placed at fixed indices or that a
+separate configuration file describes the purpose of each file
+descriptor.
+The latter is hard to accomplish,
+due to the fact that CloudABI programs cannot open configuration files
+from arbitrary locations on the filesystem.
+.Pp
+To simplify program configuration and at the same time make it easier to
+safely set up the initial set of file descriptors,
+CloudABI processes can be launched using the
+.Nm
+utility.
+.Nm
+executes a CloudABI program stored at a
+.Ar path
+and provides it a copy of YAML data read from standard input.
+The YAML data is provided in an already parsed form and can be accessed
+by using the alternative entry point
+.Fn program_main :
+.Bd -literal -offset indent
+#include <program.h>
+
+void program_main(const argdata_t *ad);
+.Ed
+.Pp
+The YAML data can be traversed by using the
+.In argdata.h
+functions
+.Fn argdata_get_binary ,
+.Fn argdata_get_bool ,
+.Fn argdata_get_float ,
+.Fn argdata_get_int ,
+.Fn argdata_get_str ,
+.Fn argdata_get_str_c ,
+.Fn argdata_get_timestamp ,
+.Fn argdata_iterate_map ,
+and
+.Fn argdata_iterate_seq .
+The names of these functions correspond to the respective YAML types.
+.Pp
+By default,
+.Nm
+executes the process with an empty set of file descriptors.
+File descriptors can be granted to the process by attaching them to the
+YAML data as objects using specialized YAML tags.
+The CloudABI process can obtain the file descriptor numbers of these
+objects by calling
+.Fn argdata_get_fd .
+.Sh YAML TAGS
+The following YAML tags can be used to provide resources to CloudABI
+processes:
+.Bl -tag -width "Four"
+.It Cm "tag:nuxi.nl,2015:cloudabi/fd: int"
+Exposes a file descriptor by decimal file descriptor number,
+or the special values
+.Dq Li stdout
+and
+.Dq Li stderr .
+.It Cm "tag:nuxi.nl,2015:cloudabi/file: map"
+Opens a file for reading.
+File objects have the following attributes:
+.Bl -tag -width "Four"
+.It Cm "path: str"
+The path of the file.
+.El
+.It Cm "tag:nuxi.nl,2015:cloudabi/socket: map"
+Creates a socket and binds it to a specified address.
+Socket objects have the following attributes:
+.Bl -tag -width "Four"
+.It Cm "bind: str"
+The address to which the socket should be bound.
+If the address starts with a
+.Pa / ,
+this creates a UNIX domain socket and binds it to the path provided.
+Otherwise,
+it resolves the address using
+.Xr getaddrinfo 3 .
+.It Cm "type: str"
+Socket type. Valid types are
+.Dq Li dgram
+for datagram sockets,
+.Dq Li seqpacket
+for sequenced-packet sockets ,
+and
+.Dq Li stream
+for stream sockets.
+.El
+.Sh EXAMPLES
+The following example shows a program that writes a fixed message to all
+of the file descriptors stored in a sequence.
+With the configuration provided,
+it writes the message to standard output three times in a row.
+.Bd -literal -offset indent
+$ cat hello.c
+#include <argdata.h>
+#include <program.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static bool print_message(const argdata_t *ad, void *unused) {
+  int fd;
+  if (argdata_get_fd(ad, &fd) == 0)
+    dprintf(fd, "Hello, world\\n");
+  return true;
+}
+
+void program_main(const argdata_t *ad) {
+  argdata_iterate_seq(ad, NULL, print_message);
+  exit(0);
+}
+$ cat hello.yaml
+%TAG ! tag:nuxi.nl,2015:cloudabi/
+---
+- !fd stdout
+- !fd stdout
+- !fd stdout
+$ x86_64-unknown-cloudabi-cc -o hello hello.c
+$ cloudabi-run hello < hello.yaml
+Hello, world
+Hello, world
+Hello, world
+.Ed
+.Pp
+Below is a simple web server that writes simple responses to incoming
+requests.
+With the configuration provided,
+it lists on TCP port 12345.
+.Bd -literal -offset indent
+$ cat webserver.c
+#include <sys/socket.h>
+
+#include <argdata.h>
+#include <program.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+void program_main(const argdata_t *ad) {
+  int sockfd;
+  argdata_get_fd(ad, &sockfd);
+  int connfd;
+  while ((connfd = accept(sockfd, NULL, NULL)) >= 0) {
+    const char buf[] = "HTTP/1.1 200 OK\\r\\n"
+                       "Content-Type: text/plain\\r\\n\\r\\n"
+                       "Hello, world\\n";
+    write(connfd, buf, sizeof(buf) - 1);
+    close(connfd);
+  }
+  exit(1);
+}
+$ cat webserver.yaml
+%TAG ! tag:nuxi.nl,2015:cloudabi/
+---
+!socket
+  bind: 0.0.0.0:12345
+  type: stream
+$ x86_64-unknown-cloudabi-cc -o webserver webserver.c
+$ cloudabi-run webserver < webserver.yaml
+.Ed
+.Sh IMPLEMENTATION NOTES
+.Nm
+invokes a helper utility called
+.Nm cloudabi-reexec
+before executing the executable stored at
+.Ar path .
+.Nm cloudabi-reexec
+is a CloudABI executable that merely acts as a proxy to guarantee that
+the process already runs in capabilities mode before executing the
+requested binary,
+making it safe to run
+.Nm
+on third-party executables.
+.Pp
+As CloudABI's
+.Fn exec
+function scans the argument data to obtain a list of file descriptors
+that need to be retained in the new process,
+.Nm
+guarantees that any file descriptors that are not specified in the YAML
+data are closed.
+File descriptors are renumbered to be contiguous, starting at file
+descriptor zero.
+.Sh AUTHORS
+CloudABI has been developed by Nuxi, the Netherlands:
+.Pa https://nuxi.nl/ .
