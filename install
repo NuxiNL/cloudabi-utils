@@ -5,6 +5,9 @@
 
 set -ex
 
-install -m 555 _obj/cloudabi-reexec "${PREFIX}/libexec/cloudabi-reexec"
-install -m 555 _obj/cloudabi-run "${PREFIX}/bin/cloudabi-run"
-install -m 444 _obj/cloudabi-run.1.gz "${PREFIX}/man/man1/cloudabi-run.1.gz"
+install -m 555 _obj/cloudabi-reexec \
+    "${DESTDIR}${PREFIX}/libexec/cloudabi-reexec"
+install -m 555 _obj/cloudabi-run \
+    "${DESTDIR}${PREFIX}/bin/cloudabi-run"
+install -m 444 _obj/cloudabi-run.1.gz \
+    "${DESTDIR}${PREFIX}/man/man1/cloudabi-run.1.gz"

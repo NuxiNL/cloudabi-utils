@@ -1,22 +1,23 @@
 #!/bin/sh
 
-# Installation directory.
-: ${PREFIX:=/usr/local}
-
-# Host toolchain parameters.
-: ${CC:=cc}
-: ${CFLAGS:=-O2 -I${PREFIX}/include}
-: ${LDFLAGS:=-L${PREFIX}/lib}
-
-# CloudABI toolchain parameters.
-: ${CLOUDABI_CC:=x86_64-unknown-cloudabi-cc}
-: ${CLOUDABI_CFLAGS:=-O2}
-
+# Warning flags.
 WARNFLAGS="-Werror -Werror-pointer-arith -Wall -Wsystem-headers \
 -Wold-style-definition -Wreturn-type -Wwrite-strings -Wswitch \
 -Wchar-subscripts -Wnested-externs -Wshadow -Wmissing-prototypes \
 -Wstrict-prototypes -Wmissing-variable-declarations -Wthread-safety \
 -Wsign-compare -Wundef -Wno-comment"
+
+# Installation directory.
+: ${PREFIX:=/usr/local}
+
+# Host toolchain parameters.
+: ${CC:=cc}
+: ${CFLAGS:=-O2 -I${PREFIX}/include ${WARNFLAGS}}
+: ${LDFLAGS:=-L${PREFIX}/lib}
+
+# CloudABI toolchain parameters.
+: ${CLOUDABI_CC:=x86_64-unknown-cloudabi-cc}
+: ${CLOUDABI_CFLAGS:=-O2 ${WARNFLAGS}}
 
 set -e
 
@@ -42,8 +43,8 @@ fi
 
 set -x
 
-${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${WARNFLAGS} ${CLOUDABI_LDFLAGS} \
+${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${CLOUDABI_LDFLAGS} \
     -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
-${CC} ${CFLAGS} ${LDFLAGS} ${WARNFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
+${CC} ${CFLAGS} ${LDFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
     -o _obj/cloudabi-run src/cloudabi-run/*.c
 gzip -9nc src/cloudabi-run/cloudabi-run.1 > _obj/cloudabi-run.1.gz
