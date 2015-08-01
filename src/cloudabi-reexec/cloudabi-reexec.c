@@ -54,6 +54,6 @@ static bool iterate(const argdata_t *ad, void *thunk) {
 }
 
 void program_main(const argdata_t *ad) {
-  argdata_iterate_seq(ad, NULL, iterate);
+  argdata_iterate_seq(ad, iterate, NULL);
   _Exit(127);
 }
