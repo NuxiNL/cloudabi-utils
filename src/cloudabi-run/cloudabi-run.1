@@ -150,7 +150,7 @@ static bool print_message(const argdata_t *ad, void *unused) {
 }
 
 void program_main(const argdata_t *ad) {
-  argdata_iterate_seq(ad, NULL, print_message);
+  argdata_iterate_seq(ad, print_message, NULL);
   exit(0);
 }
 $ cat hello.yaml
