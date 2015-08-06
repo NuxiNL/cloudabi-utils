@@ -62,11 +62,11 @@ int __argdata_get_int_u(const argdata_t *, uintmax_t *, uintmax_t);
 int argdata_get_str(const argdata_t *, const char **, size_t *);
 int argdata_get_str_c(const argdata_t *, const char **);
 int argdata_get_timestamp(const argdata_t *, struct timespec *);
-int argdata_iterate_map(const argdata_t *, void *,
-                        _Bool (*)(const argdata_t *, const argdata_t *,
-                                  void *));
-int argdata_iterate_seq(const argdata_t *, void *,
-                        _Bool (*)(const argdata_t *, void *));
+int argdata_iterate_map(const argdata_t *,
+                        _Bool (*)(const argdata_t *, const argdata_t *, void *),
+                        void *);
+int argdata_iterate_seq(const argdata_t *, _Bool (*)(const argdata_t *, void *),
+                        void *);
 void argdata_print_yaml(const argdata_t *, FILE *);
 
 // Generic fetching of integer values.
