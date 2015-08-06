@@ -42,8 +42,8 @@
 
 static const argdata_t *parse_object(yaml_parser_t *parser);
 
-// Emulation of the cloudlibc exec() function outside of CloudABI.
-static int exec(int fd, const argdata_t *ad) {
+// Emulation of the cloudlibc program_exec() function outside of CloudABI.
+static int program_exec(int fd, const argdata_t *ad) {
   // Place file descriptor and arguments data in a sequence.
   argdata_t *adfd = argdata_create_fd(fd);
   if (adfd == NULL)
@@ -86,10 +86,10 @@ static int exec(int fd, const argdata_t *ad) {
 
   // Don't execute the program directly, but call through
   // cloudabi-reexec first. This program calls the native CloudABI
-  // exec() function with the arguments provided. The native function
-  // makes sure that no other file descriptors leak into the sandboxed
-  // program. This also ensures that we're already in capabilities mode
-  // before executing the program.
+  // program_exec() function with the arguments provided. The native
+  // function makes sure that no other file descriptors leak into the
+  // sandboxed program. This also ensures that we're already in
+  // capabilities mode before executing the program.
   execve(PREFIX "/libexec/cloudabi-reexec", argv, &envp);
   return errno;
 }
@@ -151,8 +151,8 @@ static const argdata_t *parse_fd(yaml_event_t *event) {
       exit_parse_error(event, "Invalid file descriptor number");
   }
 
-  // Validate that this descriptor actually exists. exec() does not
-  // return which file descriptors are invalid, so we'd better check
+  // Validate that this descriptor actually exists. program_exec() does
+  // not return which file descriptors are invalid, so we'd better check
   // this manually over here.
   struct stat sb;
   if (fstat(fd, &sb) != 0)
@@ -457,7 +457,7 @@ int main(int argc, char *argv[]) {
   yaml_parser_delete(&parser);
 
   // Start process.
-  errno = exec(fd, ad);
+  errno = program_exec(fd, ad);
   perror("Failed to start executable");
   return 127;
 }

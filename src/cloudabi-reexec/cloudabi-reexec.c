@@ -13,8 +13,8 @@
 // The idea behind cloudabi-reexec is that by running a CloudABI
 // executable already before executing the program, we already instruct
 // the kernel to place the process in capabilities mode. Furthermore,
-// the CloudABI exec() call prevents leaking file descriptors to the new
-// process by accident.
+// the CloudABI program_exec() call prevents leaking file descriptors to
+// the new process by accident.
 //
 // When the program is unable to start the target executable, it writes
 // its error message to file descriptor 2, stderr. This is safe, as
@@ -39,7 +39,7 @@ static bool iterate(const argdata_t *ad, void *thunk) {
     return true;
   } else {
     // Second element in sequence; arguments data for the executable.
-    int error = exec(fd, ad);
+    int error = program_exec(fd, ad);
 
     // Print error message without depending on stdio.
     static const char prefix[] = "Failed to start executable: ";
