@@ -283,7 +283,7 @@ static const argdata_t *parse_seq(yaml_parser_t *parser) {
 // TODO(ed): Add support for connecting sockets.
 static const argdata_t *parse_socket(const yaml_event_t *event,
                                      yaml_parser_t *parser) {
-  const char *typestr = NULL, *bindstr = NULL;
+  const char *typestr = "stream", *bindstr = NULL;
   for (;;) {
     // Fetch key name and value.
     const argdata_t *key = parse_object(parser);
@@ -322,6 +322,8 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     exit_parse_error(event, "Unsupported type attribute: %s", typestr);
 
   // Parse the bind address.
+  if (bindstr == NULL)
+    exit_parse_error(event, "Missing bind attribute");
   const struct sockaddr *sa;
   socklen_t sal;
   struct sockaddr_un sun;
