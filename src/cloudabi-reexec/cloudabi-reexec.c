@@ -34,9 +34,7 @@ static int fd = -1;
 static bool iterate(const argdata_t *ad, void *thunk) {
   if (fd < 0) {
     // First element in sequence: a file descriptor of the executable.
-    if (argdata_get_fd(ad, &fd) != 0)
-      _Exit(127);
-    return true;
+    return argdata_get_fd(ad, &fd) == 0;
   } else {
     // Second element in sequence; arguments data for the executable.
     int error = program_exec(fd, ad);
@@ -55,5 +53,7 @@ static bool iterate(const argdata_t *ad, void *thunk) {
 
 void program_main(const argdata_t *ad) {
   argdata_iterate_seq(ad, iterate, NULL);
+  static const char message[] = "Failed to parse argument data\n";
+  write(2, message, sizeof(message) - 1);
   _Exit(127);
 }
