@@ -4,6 +4,9 @@
 // See the LICENSE file for details.
 
 #include <assert.h>
+#ifndef static_assert
+#define static_assert _Static_assert
+#endif
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>

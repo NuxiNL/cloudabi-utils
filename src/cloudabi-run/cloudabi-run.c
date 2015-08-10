@@ -27,7 +27,11 @@
 #include <netdb.h>
 #include <stdarg.h>
 #include <stdio.h>
+#ifndef __NetBSD__
 #include <stdnoreturn.h>
+#else
+#define noreturn _Noreturn
+#endif
 #include <string.h>
 #include <unistd.h>
 #include <yaml.h>
