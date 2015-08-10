@@ -22,6 +22,9 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#ifndef O_EXEC
+#define O_EXEC O_RDONLY
+#endif
 #include <inttypes.h>
 #include <limits.h>
 #include <netdb.h>
@@ -39,10 +42,6 @@
 #include "argdata.h"
 
 #define TAG_PREFIX "tag:nuxi.nl,2015:cloudabi/"
-
-#ifndef O_EXEC
-#define O_EXEC O_RDONLY
-#endif
 
 static const argdata_t *parse_object(yaml_parser_t *parser);
 
