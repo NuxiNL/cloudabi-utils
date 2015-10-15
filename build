@@ -43,14 +43,8 @@ fi
 
 set -x
 
-if [ -z "${PREBUILT_ARCH}" ]; then
-  # CloudABI compiler is available. Build executables.
-  ${CLOUDABI_CC} ${CLOUDABI_CFLAGS} ${CLOUDABI_LDFLAGS} \
-      -o _obj/cloudabi-reexec src/cloudabi-reexec/*.c
-else
-  # CloudABI compiler is not available. Use prebuilt binaries.
-  cp bin/${PREBUILT_ARCH}/cloudabi-reexec _obj/cloudabi-reexec
-fi
+# CloudABI compiler is not available. Use prebuilt binaries.
+cp bin/${ARCH}/cloudabi-reexec _obj/cloudabi-reexec
 ${CC} ${CFLAGS} ${LDFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
     -o _obj/cloudabi-run src/cloudabi-run/*.c
 gzip -9nc src/cloudabi-run/cloudabi-run.1 > _obj/cloudabi-run.1.gz
