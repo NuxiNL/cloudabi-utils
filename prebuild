@@ -1,7 +1,0 @@
-#!/bin/sh
-
-set -ex
-
-x86_64-unknown-cloudabi-cc -O2 -o bin/x86_64/cloudabi-reexec \
-    src/cloudabi-reexec/*.c
-x86_64-unknown-cloudabi-strip -s bin/x86_64/cloudabi-reexec
