@@ -1,11 +1,14 @@
 #!/bin/sh
 
+# Hardware architecture
+: ${ARCH:=x86_64}
+
 # Installation directory.
 : ${PREFIX:=/usr/local}
 
 set -ex
 
-install -m 555 _obj/cloudabi-reexec \
+install -m 555 bin/${ARCH}/cloudabi-reexec \
     "${DESTDIR}${PREFIX}/libexec/cloudabi-reexec"
 install -m 555 _obj/cloudabi-run \
     "${DESTDIR}${PREFIX}/bin/cloudabi-run"

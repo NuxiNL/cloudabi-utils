@@ -15,10 +15,6 @@ WARNFLAGS="-Werror -Werror-pointer-arith -Wall -Wsystem-headers \
 : ${CFLAGS:=-O2 -I${PREFIX}/include ${WARNFLAGS}}
 : ${LDFLAGS:=-L${PREFIX}/lib}
 
-# CloudABI toolchain parameters.
-: ${CLOUDABI_CC:=x86_64-unknown-cloudabi-cc}
-: ${CLOUDABI_CFLAGS:=-O2 ${WARNFLAGS}}
-
 set -e
 
 rm -Rf _obj
@@ -43,8 +39,6 @@ fi
 
 set -x
 
-# CloudABI compiler is not available. Use prebuilt binaries.
-cp bin/${ARCH}/cloudabi-reexec _obj/cloudabi-reexec
 ${CC} ${CFLAGS} ${LDFLAGS} "-DPREFIX=\"${PREFIX}\"" -lyaml \
     -o _obj/cloudabi-run src/cloudabi-run/*.c
 gzip -9nc src/cloudabi-run/cloudabi-run.1 > _obj/cloudabi-run.1.gz
