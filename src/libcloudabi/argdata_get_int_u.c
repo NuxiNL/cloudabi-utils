@@ -9,7 +9,8 @@
 
 #include "argdata_impl.h"
 
-int __argdata_get_int_u(const argdata_t *ad, uintmax_t *value, uintmax_t max) {
+int cloudabi_argdata_get_int_u(const argdata_t *ad, uintmax_t *value,
+                               uintmax_t max) {
   switch (ad->type) {
     case AD_BUFFER: {
       const uint8_t *buf = ad->buffer;

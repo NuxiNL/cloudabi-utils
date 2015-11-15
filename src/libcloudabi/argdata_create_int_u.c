@@ -9,7 +9,7 @@
 
 #include "argdata_impl.h"
 
-argdata_t *__argdata_create_int_u(uintmax_t value) {
+argdata_t *cloudabi_argdata_create_int_u(uintmax_t value) {
   // Allocate object with space for encoded integer value.
   static const size_t objlen = sizeof(argdata_t) + sizeof(uintmax_t) + 2;
   argdata_t *ad = malloc(objlen);

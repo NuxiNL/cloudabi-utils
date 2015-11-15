@@ -9,10 +9,10 @@
 
 #include "argdata_impl.h"
 
-argdata_t *__argdata_create_int_s(intmax_t value) {
+argdata_t *cloudabi_argdata_create_int_s(intmax_t value) {
   // Treat non-negative numbers as unsigned.
   if (value >= 0)
-    return __argdata_create_int_u(value);
+    return cloudabi_argdata_create_int_u(value);
 
   // Allocate object with space for encoded integer value.
   static const size_t objlen = sizeof(argdata_t) + sizeof(uintmax_t) + 1;
