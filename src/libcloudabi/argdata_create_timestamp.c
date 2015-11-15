@@ -3,16 +3,13 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <assert.h>
-#ifndef static_assert
-#define static_assert _Static_assert
-#endif
 #include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
 argdata_t *argdata_create_timestamp(const struct timespec *ts) {

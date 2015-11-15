@@ -8,6 +8,7 @@
 
 #include <sys/types.h>
 
+#include <argdata.h>
 #include <errno.h>
 #include <limits.h>
 #include <locale.h>
@@ -16,9 +17,7 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "argdata.h"
-
-struct __argdata {
+struct cloudabi_argdata {
   enum { AD_BUFFER, AD_BINARY, AD_MAP, AD_SEQ, AD_STR } type;
   union {
     const uint8_t *buffer;  // Buffer to code.
@@ -160,8 +159,9 @@ static inline void encode_fd(int value, uint8_t **buf) {
   *(*buf)++ = value;
 }
 
+// Validates whether a string uses valid UTF-8.
 static inline int validate_string(const char *buf, size_t len) {
-  // Allow all strings in this implementation.
+  // This implementation acts as a placeholder outside of CloudABI.
   return 0;
 }
 

@@ -23,14 +23,18 @@
 
 // <argdata.h> - argument data for programs
 
-#ifndef _ARGDATA_H_
-#define _ARGDATA_H_
+#ifndef CLOUDABI_ARGDATA_H
+#define CLOUDABI_ARGDATA_H
 
 #include <limits.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 
-typedef struct __argdata argdata_t;
+#ifndef CLOUDABI_ARGDATA_T_DECLARED
+typedef struct cloudabi_argdata argdata_t;
+#define CLOUDABI_ARGDATA_T_DECLARED
+#endif
 
 struct timespec;
 
@@ -38,6 +42,9 @@ extern const argdata_t argdata_false;
 extern const argdata_t argdata_null;
 extern const argdata_t argdata_true;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 argdata_t *argdata_create_binary(const void *, size_t);
 argdata_t *argdata_create_buffer(const void *, size_t);
 argdata_t *argdata_create_fd(int);
@@ -54,58 +61,61 @@ void argdata_free(argdata_t *);
 int argdata_get_binary(const argdata_t *, const void **, size_t *);
 void argdata_get_buffer_length(const argdata_t *, size_t *, size_t *);
 size_t argdata_get_buffer(const argdata_t *, void *, int *);
-int argdata_get_bool(const argdata_t *, _Bool *);
+int argdata_get_bool(const argdata_t *, bool *);
 int argdata_get_fd(const argdata_t *, int *);
 int argdata_get_float(const argdata_t *, double *);
-int __argdata_get_int_s(const argdata_t *, intmax_t *, intmax_t, intmax_t);
+int __argdata_get_int_s(const argdata_t *, intmax_t *, intmax_t,
+                        intmax_t);
 int __argdata_get_int_u(const argdata_t *, uintmax_t *, uintmax_t);
 int argdata_get_str(const argdata_t *, const char **, size_t *);
 int argdata_get_str_c(const argdata_t *, const char **);
 int argdata_get_timestamp(const argdata_t *, struct timespec *);
 int argdata_iterate_map(const argdata_t *,
-                        _Bool (*)(const argdata_t *, const argdata_t *, void *),
+                        bool (*)(const argdata_t *, const argdata_t *, void *),
                         void *);
-int argdata_iterate_seq(const argdata_t *, _Bool (*)(const argdata_t *, void *),
+int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
                         void *);
-void argdata_print_yaml(const argdata_t *, FILE *);
+#ifdef __cplusplus
+}
+#endif
 
 // Generic fetching of integer values.
 
 #define _ARGDATA_INT_S(type, stype, min, max)                          \
-  static __inline int __argdata_get_int_##stype(const argdata_t *__ad, \
-                                                type *__value) {       \
-    intmax_t __v;                                                      \
-    int __error;                                                       \
+  static inline int __argdata_get_int_##stype(const argdata_t *ad, \
+                                                type *value) {       \
+    intmax_t v;                                                    \
+    int error;                                                       \
                                                                        \
-    __error = __argdata_get_int_s(__ad, &__v, min, max);               \
-    if (__error != 0)                                                  \
-      return __error;                                                  \
-    *__value = __v;                                                    \
+    error = __argdata_get_int_s(ad, &v, min, max);               \
+    if (error != 0)                                                  \
+      return error;                                                  \
+    *value = (type)v;                                              \
     return 0;                                                          \
   }
 #define _ARGDATA_INT_U(type, stype, max)                               \
-  static __inline int __argdata_get_int_##stype(const argdata_t *__ad, \
-                                                type *__value) {       \
-    uintmax_t __v;                                                     \
-    int __error;                                                       \
+  static inline int __argdata_get_int_##stype(const argdata_t *ad, \
+                                                type *value) {       \
+    uintmax_t v;                                                   \
+    int error;                                                       \
                                                                        \
-    __error = __argdata_get_int_u(__ad, &__v, max);                    \
-    if (__error != 0)                                                  \
-      return __error;                                                  \
-    *__value = __v;                                                    \
+    error = __argdata_get_int_u(ad, &v, max);                    \
+    if (error != 0)                                                  \
+      return error;                                                  \
+    *value = (type)v;                                              \
     return 0;                                                          \
   }
-_ARGDATA_INT_S(char, char, CHAR_MIN, CHAR_MAX);
-_ARGDATA_INT_S(signed char, schar, SCHAR_MIN, SCHAR_MAX);
-_ARGDATA_INT_U(unsigned char, uchar, UCHAR_MAX);
-_ARGDATA_INT_S(short, short, SHRT_MIN, SHRT_MAX);
-_ARGDATA_INT_U(unsigned short, ushort, USHRT_MAX);
-_ARGDATA_INT_S(int, int, INT_MIN, INT_MAX);
-_ARGDATA_INT_U(unsigned int, uint, UINT_MAX);
-_ARGDATA_INT_S(long, long, LONG_MIN, LONG_MAX);
-_ARGDATA_INT_U(unsigned long, ulong, ULONG_MAX);
-_ARGDATA_INT_S(long long, llong, LLONG_MIN, LLONG_MAX);
-_ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX);
+_ARGDATA_INT_S(char, char, CHAR_MIN, CHAR_MAX)
+_ARGDATA_INT_S(signed char, schar, SCHAR_MIN, SCHAR_MAX)
+_ARGDATA_INT_U(unsigned char, uchar, UCHAR_MAX)
+_ARGDATA_INT_S(short, short, SHRT_MIN, SHRT_MAX)
+_ARGDATA_INT_U(unsigned short, ushort, USHRT_MAX)
+_ARGDATA_INT_S(int, int, INT_MIN, INT_MAX)
+_ARGDATA_INT_U(unsigned int, uint, UINT_MAX)
+_ARGDATA_INT_S(long, long, LONG_MIN, LONG_MAX)
+_ARGDATA_INT_U(unsigned long, ulong, ULONG_MAX)
+_ARGDATA_INT_S(long long, llong, LLONG_MIN, LLONG_MAX)
+_ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX)
 #undef _ARGDATA_INT_S
 #undef _ARGDATA_INT_U
 

@@ -3,9 +3,8 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <stdlib.h>
-
-#include "argdata.h"
 
 void argdata_free(argdata_t *ad) {
   free(ad);

@@ -3,10 +3,10 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
 static void encode_subfield(const argdata_t *, uint8_t **, int *, size_t *);

@@ -3,9 +3,9 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <stdlib.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
 argdata_t *argdata_create_map(argdata_t const *const *keys,

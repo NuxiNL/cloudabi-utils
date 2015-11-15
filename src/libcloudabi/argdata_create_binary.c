@@ -3,21 +3,19 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <stdlib.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
-argdata_t *argdata_create_seq(argdata_t const *const *entries, size_t count) {
+argdata_t *argdata_create_binary(const void *buf, size_t len) {
   argdata_t *ad = malloc(sizeof(*ad));
   if (ad == NULL)
     return NULL;
 
-  ad->type = AD_SEQ;
-  ad->seq.entries = entries;
-  ad->seq.count = count;
-  ad->length = 1;
-  for (size_t i = 0; i < count; ++i)
-    ad->length += get_subfield_length(entries[i]);
+  // Add one additional byte to the length to hold the type number.
+  ad->type = AD_BINARY;
+  ad->binary = buf;
+  ad->length = len + 1;
   return ad;
 }

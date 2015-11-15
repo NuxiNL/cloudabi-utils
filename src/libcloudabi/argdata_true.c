@@ -3,13 +3,13 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <stdint.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
-static const uint8_t buf_false[] = {ADT_BOOL};
+static const uint8_t buf_true[] = {ADT_BOOL, 1};
 
-const argdata_t argdata_false = {
-    .type = AD_BUFFER, .buffer = buf_false, .length = sizeof(buf_false),
+const argdata_t argdata_true = {
+    .type = AD_BUFFER, .buffer = buf_true, .length = sizeof(buf_true),
 };

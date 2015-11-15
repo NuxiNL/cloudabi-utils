@@ -3,9 +3,9 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <errno.h>
 
-#include "argdata.h"
 #include "argdata_impl.h"
 
 int argdata_get_str(const argdata_t *ad, const char **value, size_t *valuelen) {

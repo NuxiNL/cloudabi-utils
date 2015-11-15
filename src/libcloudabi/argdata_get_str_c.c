@@ -3,11 +3,10 @@
 // This file is distrbuted under a 2-clause BSD license.
 // See the LICENSE file for details.
 
+#include <argdata.h>
 #include <errno.h>
 #include <stdbool.h>
 #include <string.h>
-
-#include "argdata.h"
 
 int argdata_get_str_c(const argdata_t *ad, const char **value) {
   // Fetch string value.
