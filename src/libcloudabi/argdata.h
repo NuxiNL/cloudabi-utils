@@ -81,7 +81,7 @@ int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
 
 // Generic fetching of integer values.
 
-#define _ARGDATA_INT_S(type, stype, min, max)                             \
+#define CLOUDABI_ARGDATA_INT_S(type, stype, min, max)                     \
   static inline int cloudabi_argdata_get_int_##stype(const argdata_t *ad, \
                                                      type *value) {       \
     intmax_t v;                                                           \
@@ -93,7 +93,7 @@ int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
     *value = (type)v;                                                     \
     return 0;                                                             \
   }
-#define _ARGDATA_INT_U(type, stype, max)                                  \
+#define CLOUDABI_ARGDATA_INT_U(type, stype, max)                          \
   static inline int cloudabi_argdata_get_int_##stype(const argdata_t *ad, \
                                                      type *value) {       \
     uintmax_t v;                                                          \
@@ -105,19 +105,19 @@ int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
     *value = (type)v;                                                     \
     return 0;                                                             \
   }
-_ARGDATA_INT_S(char, char, CHAR_MIN, CHAR_MAX)
-_ARGDATA_INT_S(signed char, schar, SCHAR_MIN, SCHAR_MAX)
-_ARGDATA_INT_U(unsigned char, uchar, UCHAR_MAX)
-_ARGDATA_INT_S(short, short, SHRT_MIN, SHRT_MAX)
-_ARGDATA_INT_U(unsigned short, ushort, USHRT_MAX)
-_ARGDATA_INT_S(int, int, INT_MIN, INT_MAX)
-_ARGDATA_INT_U(unsigned int, uint, UINT_MAX)
-_ARGDATA_INT_S(long, long, LONG_MIN, LONG_MAX)
-_ARGDATA_INT_U(unsigned long, ulong, ULONG_MAX)
-_ARGDATA_INT_S(long long, llong, LLONG_MIN, LLONG_MAX)
-_ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX)
-#undef _ARGDATA_INT_S
-#undef _ARGDATA_INT_U
+CLOUDABI_ARGDATA_INT_S(char, char, CHAR_MIN, CHAR_MAX)
+CLOUDABI_ARGDATA_INT_S(signed char, schar, SCHAR_MIN, SCHAR_MAX)
+CLOUDABI_ARGDATA_INT_U(unsigned char, uchar, UCHAR_MAX)
+CLOUDABI_ARGDATA_INT_S(short, short, SHRT_MIN, SHRT_MAX)
+CLOUDABI_ARGDATA_INT_U(unsigned short, ushort, USHRT_MAX)
+CLOUDABI_ARGDATA_INT_S(int, int, INT_MIN, INT_MAX)
+CLOUDABI_ARGDATA_INT_U(unsigned int, uint, UINT_MAX)
+CLOUDABI_ARGDATA_INT_S(long, long, LONG_MIN, LONG_MAX)
+CLOUDABI_ARGDATA_INT_U(unsigned long, ulong, ULONG_MAX)
+CLOUDABI_ARGDATA_INT_S(long long, llong, LLONG_MIN, LLONG_MAX)
+CLOUDABI_ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX)
+#undef CLOUDABI_ARGDATA_INT_S
+#undef CLOUDABI_ARGDATA_INT_U
 
 // clang-format off
 #define argdata_create_int(value)                         \
