@@ -20,6 +20,7 @@
 
 #include <netinet/in.h>
 
+#include <argdata.h>
 #include <errno.h>
 #include <fcntl.h>
 #ifndef O_EXEC
@@ -28,6 +29,7 @@
 #include <inttypes.h>
 #include <limits.h>
 #include <netdb.h>
+#include <program.h>
 #include <stdarg.h>
 #include <stdio.h>
 #ifndef __NetBSD__
@@ -39,63 +41,9 @@
 #include <unistd.h>
 #include <yaml.h>
 
-#include "argdata.h"
-
 #define TAG_PREFIX "tag:nuxi.nl,2015:cloudabi/"
 
 static const argdata_t *parse_object(yaml_parser_t *parser);
-
-// Emulation of the cloudlibc program_exec() function outside of CloudABI.
-static int program_exec(int fd, const argdata_t *ad) {
-  // Place file descriptor and arguments data in a sequence.
-  argdata_t *adfd = argdata_create_fd(fd);
-  if (adfd == NULL)
-    return errno;
-  const argdata_t *seq[] = {adfd, ad};
-  argdata_t *adseq = argdata_create_seq(seq, sizeof(seq) / sizeof(seq[0]));
-  if (adseq == NULL) {
-    argdata_free(adfd);
-    return errno;
-  }
-
-  // Encode data. Add a trailing null byte, as execve() uses null
-  // terminated strings.
-  size_t datalen;
-  argdata_get_buffer_length(adseq, &datalen, NULL);
-  char data[datalen + 1];
-  argdata_get_buffer(adseq, data, NULL);
-  data[datalen] = '\0';
-  argdata_free(adfd);
-  argdata_free(adseq);
-
-  // Data may contain null bytes. Split data up in multiple arguments,
-  // so that all arguments concatenated (including the null bytes)
-  // correspond to the original data.
-  size_t argc = 0;
-  for (size_t i = 0; i <= datalen; ++i)
-    if (data[i] == '\0')
-      ++argc;
-  char *argv[argc + 1];
-  char *p = data;
-  for (size_t i = 0; i < argc; ++i) {
-    argv[i] = p;
-    p += strlen(p) + 1;
-  }
-  argv[argc] = NULL;
-
-  // The environment can just be empty, as CloudABI processes don't have
-  // environment variables.
-  char *envp = NULL;
-
-  // Don't execute the program directly, but call through
-  // cloudabi-reexec first. This program calls the native CloudABI
-  // program_exec() function with the arguments provided. The native
-  // function makes sure that no other file descriptors leak into the
-  // sandboxed program. This also ensures that we're already in
-  // capabilities mode before executing the program.
-  execve(PREFIX "/libexec/cloudabi-reexec", argv, &envp);
-  return errno;
-}
 
 // Obtains the next event from the YAML input stream.
 static void get_event(yaml_parser_t *parser, yaml_event_t *event) {

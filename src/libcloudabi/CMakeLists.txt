@@ -29,4 +29,5 @@ add_library(cloudabi SHARED
             argdata_null.c
             argdata_true.c
             overflow.h
-            program.h)
+            program.h
+            program_exec.c)
