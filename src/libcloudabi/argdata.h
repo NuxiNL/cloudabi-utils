@@ -120,8 +120,8 @@ _ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX)
 #undef _ARGDATA_INT_U
 
 // clang-format off
-#define argdata_create_int(value)                  \
-  _Generic(value,                                  \
+#define argdata_create_int(value)                         \
+  _Generic(value,                                         \
            char: cloudabi_argdata_create_int_s,           \
            signed char: cloudabi_argdata_create_int_s,    \
            unsigned char: cloudabi_argdata_create_int_u,  \
@@ -133,8 +133,8 @@ _ARGDATA_INT_U(unsigned long long, ullong, ULONG_MAX)
            unsigned long: cloudabi_argdata_create_int_u,  \
            long long: cloudabi_argdata_create_int_s,      \
            unsigned long long: cloudabi_argdata_create_int_u)(value)
-#define argdata_get_int(ad, value)                   \
-  _Generic(*(value),                                 \
+#define argdata_get_int(ad, value)                          \
+  _Generic(*(value),                                        \
            char: cloudabi_argdata_get_int_char,             \
            signed char: cloudabi_argdata_get_int_schar,     \
            unsigned char: cloudabi_argdata_get_int_uchar,   \
