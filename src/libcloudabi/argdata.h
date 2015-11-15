@@ -64,8 +64,7 @@ size_t argdata_get_buffer(const argdata_t *, void *, int *);
 int argdata_get_bool(const argdata_t *, bool *);
 int argdata_get_fd(const argdata_t *, int *);
 int argdata_get_float(const argdata_t *, double *);
-int __argdata_get_int_s(const argdata_t *, intmax_t *, intmax_t,
-                        intmax_t);
+int __argdata_get_int_s(const argdata_t *, intmax_t *, intmax_t, intmax_t);
 int __argdata_get_int_u(const argdata_t *, uintmax_t *, uintmax_t);
 int argdata_get_str(const argdata_t *, const char **, size_t *);
 int argdata_get_str_c(const argdata_t *, const char **);
@@ -81,29 +80,29 @@ int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
 
 // Generic fetching of integer values.
 
-#define _ARGDATA_INT_S(type, stype, min, max)                          \
+#define _ARGDATA_INT_S(type, stype, min, max)                      \
   static inline int __argdata_get_int_##stype(const argdata_t *ad, \
-                                                type *value) {       \
+                                              type *value) {       \
     intmax_t v;                                                    \
-    int error;                                                       \
-                                                                       \
-    error = __argdata_get_int_s(ad, &v, min, max);               \
-    if (error != 0)                                                  \
-      return error;                                                  \
+    int error;                                                     \
+                                                                   \
+    error = __argdata_get_int_s(ad, &v, min, max);                 \
+    if (error != 0)                                                \
+      return error;                                                \
     *value = (type)v;                                              \
-    return 0;                                                          \
+    return 0;                                                      \
   }
-#define _ARGDATA_INT_U(type, stype, max)                               \
+#define _ARGDATA_INT_U(type, stype, max)                           \
   static inline int __argdata_get_int_##stype(const argdata_t *ad, \
-                                                type *value) {       \
+                                              type *value) {       \
     uintmax_t v;                                                   \
-    int error;                                                       \
-                                                                       \
-    error = __argdata_get_int_u(ad, &v, max);                    \
-    if (error != 0)                                                  \
-      return error;                                                  \
+    int error;                                                     \
+                                                                   \
+    error = __argdata_get_int_u(ad, &v, max);                      \
+    if (error != 0)                                                \
+      return error;                                                \
     *value = (type)v;                                              \
-    return 0;                                                          \
+    return 0;                                                      \
   }
 _ARGDATA_INT_S(char, char, CHAR_MIN, CHAR_MAX)
 _ARGDATA_INT_S(signed char, schar, SCHAR_MIN, SCHAR_MAX)
