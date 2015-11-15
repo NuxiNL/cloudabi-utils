@@ -35,9 +35,6 @@ typedef struct cloudabi_argdata argdata_t;
 extern "C" {
 #endif
 int program_exec(int, const argdata_t *);
-#ifdef __FreeBSD__
-int program_spawn(int, const argdata_t *);
-#endif
 #ifdef __cplusplus
 }
 #endif
