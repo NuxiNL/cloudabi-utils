@@ -3,5 +3,12 @@ project(cloudabi-utils)
 
 include_directories("${PROJECT_SOURCE_DIR}/src/libcloudabi")
 
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
+    add_subdirectory(bin/x86_64)
+elseif(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+    add_subdirectory(bin/aarch64)
+else()
+    add_subdirectory(bin/${CMAKE_SYSTEM_PROCESSOR})
+endif()
 add_subdirectory(src/cloudabi-run)
 add_subdirectory(src/libcloudabi)
