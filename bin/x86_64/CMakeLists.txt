@@ -1,4 +1,4 @@
 include(GNUInstallDirs)
 
-install(FILES cloudabi-reexec
+install(PROGRAMS cloudabi-reexec
         DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
