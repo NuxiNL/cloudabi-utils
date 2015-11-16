@@ -26,12 +26,12 @@ CloudABI process:
 #include <fcntl.h>
 #include <program.h>
 
-void start_my_executable(void) {
-#ifdef O_EXEC
-    int fd = open("/my/executable", O_EXEC);
-#else
-    int fd = open("/my/executable", O_RDONLY);
+#ifndef O_EXEC
+#define O_EXEC O_RDONLY
 #endif
+
+void start_my_executable(void) {
+    int fd = open("/my/executable", O_EXEC);
     const argdata_t *keys[] = {
         argdata_create_str_c("first_name"),
         argdata_create_str_c("last_name"),
