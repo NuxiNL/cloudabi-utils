@@ -40,7 +40,7 @@ void start_my_executable(void) {
     const argdata_t *values[] = {
         argdata_create_str_c("bobby"),
         argdata_create_str_c("tables"),
-        argdata_create_int(16);
+        argdata_create_int(16),
     };
     program_exec(fd, argdata_create_map(keys, values, 3));
 }
