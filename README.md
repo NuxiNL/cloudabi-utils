@@ -57,7 +57,9 @@ built by the
 Finally, this package provides the `cloudabi-run` utility, which is
 built on top of `libcloudabi`. This utility reads a YAML file from
 `stdin`, converts it to an argument data structure, and uses that to
-start a CloudABI executable.
+start a CloudABI executable. It provides some special tags to
+automatically open files and network connections. Please refer to
+`cloudabi-run`'s manual page for examples.
 
 More details about CloudABI can be found on
 [Nuxi's company webpage](https://nuxi.nl/).
