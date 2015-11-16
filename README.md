@@ -17,10 +17,39 @@ available as part of CloudABI's C library, namely:
   This function can be used to start a CloudABI executable, providing it
   an argument data structure.
 
-To ensure that these implementations conform to CloudABI's safety
+Below is a simple example (without any error handling or memory
+management) that demonstrates how these APIs can be used to execute a
+CloudABI process:
+
+```c
+#include <argdata.h>
+#include <fcntl.h>
+#include <program.h>
+
+void start_my_executable(void) {
+#ifdef O_EXEC
+    int fd = open("/my/executable", O_EXEC);
+#else
+    int fd = open("/my/executable", O_RDONLY);
+#endif
+    const argdata_t *keys[] = {
+        argdata_create_str_c("first_name"),
+        argdata_create_str_c("last_name"),
+        argdata_create_str_c("age"),
+    };
+    const argdata_t *values[] = {
+        argdata_create_str_c("bobby"),
+        argdata_create_str_c("tables"),
+        argdata_create_int(16);
+    };
+    program_exec(fd, argdata_create_map(keys, values, 3));
+}
+```
+
+To ensure that this implementation conform to CloudABI's safety
 requirement that file descriptors that are not referenced from the
-argument data structure are never leaked into new processes, this
-implementation depends on a small proxy executable called
+argument data structure are never leaked into new processes,
+`program_exec()` depends on a small proxy executable called
 `cloudabi-reexec`. This package ships with prebuilt copies that were
 built by the
 [CloudABI Ports Collection](https://github.com/NuxiNL/cloudabi-ports/tree/master/packages/cloudabi-reexec).
