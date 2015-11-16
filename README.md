@@ -38,8 +38,8 @@ void start_my_executable(void) {
         argdata_create_str_c("age"),
     };
     const argdata_t *values[] = {
-        argdata_create_str_c("bobby"),
-        argdata_create_str_c("tables"),
+        argdata_create_str_c("Bobby"),
+        argdata_create_str_c("Tables"),
         argdata_create_int(16),
     };
     program_exec(fd, argdata_create_map(keys, values, 3));
