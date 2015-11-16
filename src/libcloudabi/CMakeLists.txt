@@ -16,6 +16,7 @@ add_library(cloudabi SHARED
             program_exec.c)
 add_definitions(-DPATH_CLOUDABI_REEXEC="${CMAKE_INSTALL_FULL_LIBEXECDIR}/cloudabi-reexec")
 
+set_property(TARGET cloudabi PROPERTY VERSION "0")
 install(TARGETS cloudabi LIBRARY
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES argdata.h program.h
