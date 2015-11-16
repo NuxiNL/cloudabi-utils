@@ -1,5 +1,6 @@
+include(GNUInstallDirs)
+
 add_library(cloudabi SHARED
-            argdata.h
             argdata_create_binary.c
             argdata_create_buffer.c
             argdata_create_fd.c
@@ -28,9 +29,10 @@ add_library(cloudabi SHARED
             argdata_iterate_seq.c
             argdata_null.c
             argdata_true.c
-            overflow.h
-            program.h
             program_exec.c)
-
-include(GNUInstallDirs)
 add_definitions(-DPATH_CLOUDABI_REEXEC="${CMAKE_INSTALL_FULL_LIBEXECDIR}/cloudabi-reexec")
+
+install(TARGETS cloudabi LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES argdata.h program.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/cloudabi)
