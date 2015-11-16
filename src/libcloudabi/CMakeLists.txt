@@ -31,3 +31,6 @@ add_library(cloudabi SHARED
             overflow.h
             program.h
             program_exec.c)
+
+include(GNUInstallDirs)
+add_definitions(-DPATH_CLOUDABI_REEXEC="${CMAKE_INSTALL_FULL_LIBEXECDIR}/cloudabi-reexec")
