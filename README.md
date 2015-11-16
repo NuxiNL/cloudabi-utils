@@ -47,11 +47,11 @@ void start_my_executable(void) {
 ```
 
 To ensure that this implementation conform to CloudABI's safety
-requirement that file descriptors that are not referenced from the
-argument data structure are never leaked into new processes,
-`program_exec()` depends on a small proxy executable called
-`cloudabi-reexec`. This package ships with prebuilt copies that were
-built by the
+requirements that it is safe to run untrusted programs, and that file
+descriptors that are not referenced from the argument data structure are
+never leaked into new processes, `program_exec()` depends on a small
+proxy executable called `cloudabi-reexec`. This package ships with
+prebuilt copies that were built by the
 [CloudABI Ports Collection](https://github.com/NuxiNL/cloudabi-ports/tree/master/packages/cloudabi-reexec).
 
 Finally, this package provides the `cloudabi-run` utility, which is
