@@ -13,7 +13,7 @@ available as part of CloudABI's C library, namely:
   arguments.
 
 * A POSIX implementation of CloudABI's
-  [`program_main()` function](https://github.com/NuxiNL/cloudlibc/blob/master/src/include/program.h).
+  [`program_exec()` function](https://github.com/NuxiNL/cloudlibc/blob/master/src/include/program.h).
   This function can be used to start a CloudABI executable, providing it
   an argument data structure.
 
