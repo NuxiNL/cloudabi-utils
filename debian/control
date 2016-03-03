@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Ed Schouten <ed@nuxi.nl>
 Build-depends: cmake, debhelper (>= 9), libyaml-dev
-Standards-Version: 3.9.6
+Standards-Version: 3.9.7
 Homepage: https://nuxi.nl/
 Vcs-Git: https://github.com/NuxiNL/cloudabi-utils.git
 Vcs-Browser: https://github.com/NuxiNL/cloudabi-utils
