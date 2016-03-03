@@ -1,19 +1,5 @@
-cloudabi-utils (0.8-2) unstable; urgency=medium
-
-  * Add Debian watch file.
-  * Add missing header to the copyright file.
-
- -- Ed Schouten <ed@nuxi.nl>  Thu, 03 Mar 2016 20:01:22 +0100
-
 cloudabi-utils (0.8-1) unstable; urgency=medium
 
-  * Upgrade to latest upstream version.
-    Includes new cloudabi-reexec binaries.
+  * Initial release (Closes: #816649).
 
- -- Ed Schouten <ed@nuxi.nl>  Thu, 03 Mar 2016 17:28:39 +0100
-
-cloudabi-utils (0.7) unstable; urgency=medium
-
-  * Initial release.
-
- -- Ed Schouten <ed@nuxi.nl>  Thu, 03 Mar 2016 16:19:13 +0100
+ -- Ed Schouten <ed@nuxi.nl>  Thu, 03 Mar 2016 20:01:22 +0100
