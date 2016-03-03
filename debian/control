@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Ed Schouten <ed@nuxi.nl>
 Build-depends: cmake, debhelper (>= 9), libyaml-dev
-Standards-Version: 3.9.7
+Standards-Version: 3.9.6
 Homepage: https://nuxi.nl/
 Vcs-Git: https://github.com/NuxiNL/cloudabi-utils.git
 Vcs-Browser: https://github.com/NuxiNL/cloudabi-utils
@@ -37,7 +37,7 @@ Package: libcloudabi-dev
 Section: libdevel
 Architecture: amd64 arm64
 Depends: ${misc:Depends}, ${shlibs:Depends}, libcloudabi0 (= ${binary:Version})
-Description: Native ports of CloudABI functions (development fils)
+Description: Native ports of CloudABI functions (development files)
  To be able to start CloudABI programs from Linux, a number of
  programming interfaces from CloudABI have been ported over into this
  library. This library provides native versions of functions normally
