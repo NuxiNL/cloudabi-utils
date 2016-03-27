@@ -21,7 +21,7 @@
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
-.Dd August 7, 2015
+.Dd March 27, 2016
 .Dt CLOUDABI-RUN 1
 .Os
 .Sh NAME
@@ -76,9 +76,9 @@ functions
 .Fn argdata_get_str ,
 .Fn argdata_get_str_c ,
 .Fn argdata_get_timestamp ,
-.Fn argdata_iterate_map ,
+.Fn argdata_map_iterate ,
 and
-.Fn argdata_iterate_seq .
+.Fn argdata_seq_iterate .
 The names of these functions correspond to the respective YAML types.
 .Pp
 By default,
@@ -140,19 +140,18 @@ it writes the message to standard output three times in a row.
 $ cat hello.c
 #include <argdata.h>
 #include <program.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-static bool print_message(const argdata_t *ad, void *unused) {
-  int fd;
-  if (argdata_get_fd(ad, &fd) == 0)
-    dprintf(fd, "Hello, world\\n");
-  return true;
-}
-
 void program_main(const argdata_t *ad) {
-  argdata_iterate_seq(ad, print_message, NULL);
+  argdata_seq_iterator_t it;
+  argdata_seq_iterate(ad, &it);
+  const argdata_t *value;
+  while (argdata_seq_next(&it, &value)) {
+    int fd;
+    if (argdata_get_fd(ad, &fd) == 0)
+      dprintf(fd, "Hello, world\\n");
+  }
   exit(0);
 }
 $ cat hello.yaml

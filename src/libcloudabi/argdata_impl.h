@@ -1,4 +1,4 @@
-// Copyright (c) 2015 Nuxi, https://nuxi.nl/
+// Copyright (c) 2015-2016 Nuxi (https://nuxi.nl/) and contributors.
 //
 // This file is distributed under a 2-clause BSD license.
 // See the LICENSE file for details.
@@ -9,10 +9,13 @@
 #include <sys/types.h>
 
 #include <argdata.h>
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <locale.h>
+#include <stdalign.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <wchar.h>
@@ -36,6 +39,41 @@ struct cloudabi_argdata {
   // Length of the resulting binary code.
   size_t length;
 };
+
+struct cloudabi_argdata_map_iterator {
+  alignas(long) int error;
+  const argdata_t *container;
+  size_t offset;
+  argdata_t key;
+  argdata_t value;
+};
+
+static_assert(sizeof(struct cloudabi_argdata_map_iterator) <=
+                  sizeof(argdata_map_iterator_t),
+              "Invalid size");
+static_assert(alignof(struct cloudabi_argdata_map_iterator) ==
+                  alignof(argdata_map_iterator_t),
+              "Invalid alignment");
+static_assert(offsetof(struct cloudabi_argdata_map_iterator, error) ==
+                  offsetof(argdata_map_iterator_t, error),
+              "Invalid offset");
+
+struct cloudabi_argdata_seq_iterator {
+  alignas(long) int error;
+  const argdata_t *container;
+  size_t offset;
+  argdata_t value;
+};
+
+static_assert(sizeof(struct cloudabi_argdata_seq_iterator) <=
+                  sizeof(argdata_seq_iterator_t),
+              "Invalid size");
+static_assert(alignof(struct cloudabi_argdata_seq_iterator) ==
+                  alignof(argdata_seq_iterator_t),
+              "Invalid align");
+static_assert(offsetof(struct cloudabi_argdata_seq_iterator, error) ==
+                  offsetof(argdata_seq_iterator_t, error),
+              "Invalid offset");
 
 enum {
   ADT_BINARY = 1,    // A sequence of zero or more octets.

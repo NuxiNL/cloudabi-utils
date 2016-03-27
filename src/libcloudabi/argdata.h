@@ -36,6 +36,16 @@ typedef struct cloudabi_argdata argdata_t;
 #define CLOUDABI_ARGDATA_T_DECLARED
 #endif
 
+typedef struct {
+  _Alignas(long) int error;
+  char data[128];
+} argdata_map_iterator_t;
+
+typedef struct {
+  _Alignas(long) int error;
+  char data[128];
+} argdata_seq_iterator_t;
+
 struct timespec;
 
 extern const argdata_t argdata_false;
@@ -70,11 +80,11 @@ int cloudabi_argdata_get_int_u(const argdata_t *, uintmax_t *, uintmax_t);
 int argdata_get_str(const argdata_t *, const char **, size_t *);
 int argdata_get_str_c(const argdata_t *, const char **);
 int argdata_get_timestamp(const argdata_t *, struct timespec *);
-int argdata_iterate_map(const argdata_t *,
-                        bool (*)(const argdata_t *, const argdata_t *, void *),
-                        void *);
-int argdata_iterate_seq(const argdata_t *, bool (*)(const argdata_t *, void *),
-                        void *);
+int argdata_map_iterate(const argdata_t *, argdata_map_iterator_t *);
+_Bool argdata_map_next(argdata_map_iterator_t *, const argdata_t **,
+                       const argdata_t **);
+int argdata_seq_iterate(const argdata_t *, argdata_seq_iterator_t *);
+_Bool argdata_seq_next(argdata_seq_iterator_t *, const argdata_t **);
 #ifdef __cplusplus
 }
 #endif
