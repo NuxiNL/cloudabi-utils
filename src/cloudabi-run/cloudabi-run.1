@@ -21,7 +21,7 @@
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
-.Dd March 27, 2016
+.Dd April 19, 2016
 .Dt CLOUDABI-RUN 1
 .Os
 .Sh NAME
@@ -29,6 +29,7 @@
 .Nd "execute CloudABI processes"
 .Sh SYNOPSIS
 .Nm
+.Op Fl e
 .Ar path
 .Sh DESCRIPTION
 CloudABI is a purely capability-based runtime environment,
@@ -89,6 +90,16 @@ YAML data as objects using specialized YAML tags.
 The CloudABI process can obtain the file descriptor numbers of these
 objects by calling
 .Fn argdata_get_fd .
+.Pp
+CloudABI executables can be executed directly on operating systems that
+have a compatibility layer for CloudABI executables.
+Alternatively,
+.Nm
+includes a built-in emulator that can be enabled by providing the
+.Fl e
+flag.
+The use of this emulator is strongly discouraged if the operating system
+provides native support for CloudABI.
 .Sh YAML TAGS
 The following YAML tags can be used to provide resources to CloudABI
 processes:
@@ -225,6 +236,11 @@ guarantees that any file descriptors that are not specified in the YAML
 data are closed.
 File descriptors are renumbered to be contiguous, starting at file
 descriptor zero.
+.Pp
+The emulator makes no attempt to sandbox the execution of running
+processes.
+It should therefore only be used for development and testing purposes.
+Using it in production is strongly discouraged.
 .Sh AUTHORS
 CloudABI has been developed by Nuxi, the Netherlands:
 .Pa https://nuxi.nl/ .
