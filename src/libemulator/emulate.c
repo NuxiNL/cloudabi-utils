@@ -37,6 +37,11 @@ static bool do_pread(int fd, void *buf, size_t len, off_t pos) {
     ssize_t retval = pread(fd, bufp, len, pos);
     if (retval < 0)
       return false;
+    if (retval == 0) {
+      // Short reads should not occur.
+      errno = ENOEXEC;
+      return false;
+    }
     bufp += retval;
     pos += retval;
     len -= retval;
