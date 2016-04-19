@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
       exit(127);
     }
     void *buf = &fds[fdslen];
-    argdata_get_buffer(ad, buf, fds);
+    fdslen = argdata_get_buffer(ad, buf, fds);
 
     // Register file descriptors.
     struct fd_table ft;
