@@ -23,6 +23,7 @@
 #include "emulate.h"
 #include "posix.h"
 #include "random.h"
+#include "signals.h"
 #include "tidpool.h"
 #include "tls.h"
 
@@ -236,6 +237,9 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
       {.a_type = CLOUDABI_AT_TID, .a_val = tid},
       {.a_type = CLOUDABI_AT_NULL},
   };
+
+  // Reset signals to their default behaviour.
+  signals_init();
 
   // Set up a new TLS area.
   curtid = tid;
