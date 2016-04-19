@@ -41,6 +41,9 @@
 #include <unistd.h>
 #include <yaml.h>
 
+#include "../libemulator/emulate.h"
+#include "../libemulator/posix.h"
+
 #define TAG_PREFIX "tag:nuxi.nl,2015:cloudabi/"
 
 static const argdata_t *parse_object(yaml_parser_t *parser);
@@ -389,18 +392,29 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
   }
 }
 
-int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    fprintf(stderr, "usage: cloudabi-run executable\n");
-    return 127;
-  }
+noreturn void usage(void) {
+  fprintf(stderr, "usage: cloudabi-run [-e] executable\n");
+  exit(127);
+}
 
-  // Open target executable.
-  int fd = open(argv[1], O_EXEC);
-  if (fd == -1) {
-    perror("Failed to open executable");
-    return 127;
+int main(int argc, char *argv[]) {
+  // Parse command line options.
+  bool do_emulate = false;
+  char c;
+  while ((c = getopt(argc, argv, "e")) != -1) {
+    switch (c) {
+      case 'e':
+        // Run program using emulation.
+        do_emulate = true;
+        break;
+      default:
+        usage();
+    }
   }
+  argv += optind;
+  argc -= optind;
+  if (argc != 1)
+    usage();
 
   // Parse YAML configuration.
   yaml_parser_t parser;
@@ -409,8 +423,53 @@ int main(int argc, char *argv[]) {
   const argdata_t *ad = parse_object(&parser);
   yaml_parser_delete(&parser);
 
-  // Start process.
-  errno = program_exec(fd, ad);
+  if (do_emulate) {
+    // Serialize argument data that needs to be passed to the executable.
+    size_t buflen, fdslen;
+    argdata_get_buffer_length(ad, &buflen, &fdslen);
+    int *fds = malloc(fdslen * sizeof(fds[0]) + buflen);
+    if (fds == NULL) {
+      perror("Cannot allocate argument data buffer");
+      exit(127);
+    }
+    void *buf = &fds[fdslen];
+    argdata_get_buffer(ad, buf, fds);
+
+    // Register file descriptors.
+    struct fd_table ft;
+    fd_table_init(&ft);
+    for (size_t i = 0; i < fdslen; ++i) {
+      if (!fd_table_insert_existing(&ft, i, fds[i])) {
+        perror("Failed to register file descriptor in argument data");
+        exit(127);
+      }
+    }
+
+    // Call into the emulator to run the program inside of this process.
+    // Throw a warning message before beginning execution, as emulation
+    // is not considered secure.
+    int fd = open(argv[0], O_RDONLY);
+    if (fd == -1) {
+      perror("Failed to open executable");
+      return 127;
+    }
+    fprintf(stderr,
+            "WARNING: Attempting to start executable using emulation.\n"
+            "Keep in mind that this emulation provides no actual sandboxing.\n"
+            "Though this is likely no problem for development and testing\n"
+            "purposes, using this emulator in production is strongly\n"
+            "discouraged.\n");
+
+    emulate(fd, buf, buflen, &posix_syscalls);
+  } else {
+    // Execute the application directly through the operating system.
+    int fd = open(argv[0], O_EXEC);
+    if (fd == -1) {
+      perror("Failed to open executable");
+      return 127;
+    }
+    errno = program_exec(fd, ad);
+  }
   perror("Failed to start executable");
   return 127;
 }

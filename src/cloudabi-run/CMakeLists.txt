@@ -7,7 +7,7 @@ include_directories(${YAML_INCLUDE_DIRS})
 link_directories(${YAML_LIBRARY_DIRS})
 
 add_executable(cloudabi-run cloudabi-run.c)
-target_link_libraries(cloudabi-run cloudabi ${YAML_LIBRARIES})
+target_link_libraries(cloudabi-run cloudabi emulator ${YAML_LIBRARIES})
 
 install(TARGETS cloudabi-run
         DESTINATION ${CMAKE_INSTALL_BINDIR})
