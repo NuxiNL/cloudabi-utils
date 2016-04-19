@@ -197,7 +197,8 @@ void program_main(const argdata_t *ad) {
     int connfd;
     while ((connfd = accept(sockfd, NULL, NULL)) >= 0) {
       const char buf[] = "HTTP/1.1 200 OK\\r\\n"
-                         "Content-Type: text/plain\\r\\n\\r\\n"
+                         "Content-Type: text/plain\\r\\n"
+                         "Content-Length: 13\\r\\n\\r\\n"
                          "Hello, world\\n";
       write(connfd, buf, sizeof(buf) - 1);
       close(connfd);
