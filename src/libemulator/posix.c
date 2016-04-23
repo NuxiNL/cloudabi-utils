@@ -1560,8 +1560,14 @@ static void path_put(struct path_access *pa) UNLOCKS(pa->fd_object->refcount) {
   fd_object_release(pa->fd_object);
 }
 
+#ifdef UTIME_NOW
+#define HAS_UTIMENS 1
+#else
+#define HAS_UTIMENS 0
+#endif
+
 #define HAS_CWD_LOCK                                            \
-  (!CONFIG_HAS_MKFIFOAT ||                                      \
+  (!HAS_UTIMENS || !CONFIG_HAS_MKFIFOAT ||                      \
    !(CONFIG_HAS_BINDAT_SOCKADDR || CONFIG_HAS_BINDAT_STRING) || \
    !(CONFIG_HAS_CONNECTAT_SOCKADDR || CONFIG_HAS_CONNECTAT_STRING))
 
@@ -1979,7 +1985,7 @@ static void convert_timestamp(cloudabi_timestamp_t in, struct timespec *out) {
   };
 }
 
-#ifdef UTIME_NOW
+#if HAS_UTIMENS
 
 // Converts the provided timestamps and flags to a set of arguments for
 // futimens() and utimensat().
@@ -2089,7 +2095,7 @@ static cloudabi_errno_t file_stat_fput(cloudabi_fd_t fd,
     if (error != 0)
       return error;
 
-#ifdef UTIME_NOW
+#if HAS_UTIMENS
     struct timespec ts[2];
     convert_utimens_arguments(buf, flags, ts);
     int ret = futimens(fd_number(fo), ts);
@@ -2167,7 +2173,7 @@ static cloudabi_errno_t file_stat_put(cloudabi_lookup_t fd, const char *path,
   if (error != 0)
     return error;
 
-#ifdef UTIME_NOW
+#if HAS_UTIMENS
   struct timespec ts[2];
   convert_utimens_arguments(buf, flags, ts);
   int ret = utimensat(pa.fd, pa.path, ts, pa.follow ? 0 : AT_SYMLINK_NOFOLLOW);
