@@ -150,6 +150,9 @@ static cloudabi_errno_t convert_errno(int error) {
     X(ENOPROTOOPT),
     X(ENOSPC),
     X(ENOSYS),
+#ifdef ENOTCAPABLE
+    X(ENOTCAPABLE),
+#endif
     X(ENOTCONN),
     X(ENOTDIR),
     X(ENOTEMPTY),
