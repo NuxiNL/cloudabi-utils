@@ -335,16 +335,24 @@ struct fd_object {
   cloudabi_filetype_t type;
   int number;
 
+  union {
 #if !CONFIG_HAS_PDFORK
-  // Data associated with process descriptors.
-  struct {
-    pid_t pid;                     // Process ID of the child process.
-    struct mutex lock;             // Lock to protect members below.
-    bool terminated;               // Process has terminated.
-    cloudabi_signal_t signal;      // If not zero, termination signal.
-    cloudabi_exitcode_t exitcode;  // If signal is zero, exit code.
-  } process;
+    // Data associated with process descriptors.
+    struct {
+      pid_t pid;                     // Process ID of the child process.
+      struct mutex lock;             // Lock to protect members below.
+      bool terminated;               // Process has terminated.
+      cloudabi_signal_t signal;      // If not zero, termination signal.
+      cloudabi_exitcode_t exitcode;  // If signal is zero, exit code.
+    } process;
 #endif
+    // Data associated with directory file descriptors.
+    struct {
+      struct mutex lock;            // Lock to protect members below.
+      DIR *handle;                  // Directory handle.
+      cloudabi_dircookie_t offset;  // Offset of the directory.
+    } directory;
+  };
 };
 
 struct fd_entry {
@@ -536,6 +544,16 @@ static int fd_number(const struct fd_object *fo) {
 static void fd_object_release(struct fd_object *fo) UNLOCKS(fo->refcount) {
   if (refcount_release(&fo->refcount)) {
     switch (fo->type) {
+      case CLOUDABI_FILETYPE_DIRECTORY:
+        // For directories we may keep track of a DIR object. Calling
+        // closedir() on it also closes the underlying file descriptor.
+        mutex_destroy(&fo->directory.lock);
+        if (fo->directory.handle == NULL) {
+          close(fd_number(fo));
+        } else {
+          closedir(fo->directory.handle);
+        }
+        break;
 #if !CONFIG_HAS_KQUEUE
       case CLOUDABI_FILETYPE_POLL:
         break;
@@ -573,6 +591,10 @@ bool fd_table_insert_existing(struct fd_table *ft, cloudabi_fd_t in, int out) {
   if (error != 0)
     return false;
   fo->number = out;
+  if (type == CLOUDABI_FILETYPE_DIRECTORY) {
+    mutex_init(&fo->directory.lock);
+    fo->directory.handle = NULL;
+  }
 
   // Grow the file descriptor table if needed.
   rwlock_wrlock(&ft->lock);
@@ -634,6 +656,10 @@ static cloudabi_errno_t fd_table_insert_fd(struct fd_table *ft, int in,
     return error;
   }
   fo->number = in;
+  if (type == CLOUDABI_FILETYPE_DIRECTORY) {
+    mutex_init(&fo->directory.lock);
+    fo->directory.handle = NULL;
+  }
   return fd_table_insert(ft, fo, rights_base, rights_inheriting, out);
 }
 
@@ -1805,19 +1831,29 @@ static cloudabi_errno_t file_readdir(cloudabi_fd_t fd, void *buf, size_t nbyte,
     return error;
   }
 
-  // Reopen the directory, to ensure we have a file descriptor that has
-  // its own offset. Then use fdopendir() to turn it into a directory
-  // handle that is set to the right offset.
-  int dfd = openat(fd_number(fo), ".", O_RDONLY);
-  fd_object_release(fo);
-  if (dfd < 0)
-    return convert_errno(errno);
-  DIR *dp = fdopendir(dfd);
+  // Create a directory handle if none has been opened yet.
+  mutex_lock(&fo->directory.lock);
+  DIR *dp = fo->directory.handle;
   if (dp == NULL) {
-    close(dfd);
-    return convert_errno(errno);
+    dp = fdopendir(fd_number(fo));
+    if (dp == NULL) {
+      mutex_unlock(&fo->directory.lock);
+      fd_object_release(fo);
+      return convert_errno(errno);
+    }
+    fo->directory.handle = dp;
+    fo->directory.offset = CLOUDABI_DIRCOOKIE_START;
   }
-  seekdir(dp, cookie);
+
+  // Seek to the right position if the requested offset does not match
+  // the current offset.
+  if (fo->directory.offset != cookie) {
+    if (cookie == CLOUDABI_DIRCOOKIE_START)
+      rewinddir(dp);
+    else
+      seekdir(dp, cookie);
+    fo->directory.offset = cookie;
+  }
 
   *bufused = 0;
   while (nbyte > 0) {
@@ -1825,23 +1861,16 @@ static cloudabi_errno_t file_readdir(cloudabi_fd_t fd, void *buf, size_t nbyte,
     errno = 0;
     struct dirent *de = readdir(dp);
     if (de == NULL) {
-      closedir(dp);
+      mutex_unlock(&fo->directory.lock);
+      fd_object_release(fo);
       return errno == 0 || *bufused > 0 ? 0 : convert_errno(errno);
     }
-    long next = telldir(dp);
-#if CONFIG_HAS_SEEKDIR_BROKEN
-    // OS X seems to completely ignore our call to seekdir(). Skip any
-    // leading entries that have an offset that is lower than what we
-    // requested. This completely wrecks performance, as it makes
-    // directory iteration run in quadratic time.
-    if (next <= cookie)
-      continue;
-#endif
+    fo->directory.offset = telldir(dp);
 
     // Craft a directory entry and copy that back.
     size_t namlen = strlen(de->d_name);
     cloudabi_dirent_t cde = {
-        .d_next = next, .d_ino = de->d_ino, .d_namlen = namlen,
+        .d_next = fo->directory.offset, .d_ino = de->d_ino, .d_namlen = namlen,
     };
     switch (de->d_type) {
       case DT_BLK:
@@ -1875,7 +1904,8 @@ static cloudabi_errno_t file_readdir(cloudabi_fd_t fd, void *buf, size_t nbyte,
     file_readdir_put(buf, nbyte, bufused, &cde, sizeof(cde));
     file_readdir_put(buf, nbyte, bufused, de->d_name, namlen);
   }
-  closedir(dp);
+  mutex_unlock(&fo->directory.lock);
+  fd_object_release(fo);
   return 0;
 }
 

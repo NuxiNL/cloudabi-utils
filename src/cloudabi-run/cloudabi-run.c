@@ -392,7 +392,7 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
   }
 }
 
-noreturn void usage(void) {
+static noreturn void usage(void) {
   fprintf(stderr, "usage: cloudabi-run [-e] executable\n");
   exit(127);
 }

@@ -103,12 +103,6 @@
 #endif
 
 #ifdef __APPLE__
-#define CONFIG_HAS_SEEKDIR_BROKEN 1
-#else
-#define CONFIG_HAS_SEEKDIR_BROKEN 0
-#endif
-
-#ifdef __APPLE__
 #define st_atimespec st_atim
 #define st_mtimespec st_mtim
 #define st_ctimespec st_ctim
