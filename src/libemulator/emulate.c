@@ -5,6 +5,9 @@
 
 #include "config.h"
 
+#if CONFIG_HAS_CAP_ENTER
+#include <sys/capsicum.h>
+#endif
 #include <sys/mman.h>
 
 #include <errno.h>
@@ -27,7 +30,9 @@
 #include "tidpool.h"
 #include "tls.h"
 
+#ifndef roundup
 #define roundup(a, b) (((a) + (b)-1) / (b) * (b))
+#endif
 
 // Reads data from a file at an offset and validates that the requested
 // amount of data is returned.
@@ -245,6 +250,13 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
 
   // Reset signals to their default behaviour.
   signals_init();
+
+#if CONFIG_HAS_CAP_ENTER
+  // Make use of the host system's support for Capsicum. By enabling
+  // this, there is no need to emulate any of the directory sandboxing
+  // features.
+  cap_enter();
+#endif
 
   // Set up a new TLS area.
   curtid = tid;
