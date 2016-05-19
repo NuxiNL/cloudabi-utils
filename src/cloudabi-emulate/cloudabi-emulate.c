@@ -23,9 +23,8 @@ void program_main(const argdata_t *ad) {
   const argdata_t *fdv, *argv;
   int fd;
   if (!argdata_seq_next(&it, &fdv) || argdata_get_fd(fdv, &fd) != 0 ||
-      !argdata_seq_next(&it, &argv)) {
+      !argdata_seq_next(&it, &argv))
     _Exit(127);
-  }
 
   // Serialize argument data that needs to be passed to the executable.
   size_t buflen, fdslen;
