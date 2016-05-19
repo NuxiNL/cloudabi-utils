@@ -26,7 +26,7 @@ static int urandom;
 static void open_urandom(void) {
   urandom = open("/dev/urandom", O_RDONLY);
   if (urandom < 0) {
-    fprintf(stderr, "Failed to open /dev/urandom");
+    fputs("Failed to open /dev/urandom\n", stderr);
     abort();
   }
 }
@@ -36,7 +36,7 @@ void random_buf(void *buf, size_t len) {
   pthread_once(&open_once, open_urandom);
 
   if (read(urandom, buf, len) != len) {
-    fprintf(stderr, "Short read on /dev/urandom");
+    fputs("Short read on /dev/urandom\n", stderr);
     abort();
   }
 }

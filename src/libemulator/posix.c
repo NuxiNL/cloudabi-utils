@@ -2537,7 +2537,7 @@ static cloudabi_errno_t poll(const cloudabi_subscription_t *in,
       case CLOUDABI_CLOCK_MONOTONIC:
         if ((in[0].clock.flags & CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) != 0) {
           // TODO(ed): Implement.
-          fprintf(stderr, "Unimplemented absolute sleep on monotonic clock\n");
+          fputs("Unimplemented absolute sleep on monotonic clock\n", stderr);
           out[0].error = CLOUDABI_ENOSYS;
         } else {
           // Perform relative sleeps on the monotonic clock also using
@@ -2602,7 +2602,7 @@ static cloudabi_errno_t poll(const cloudabi_subscription_t *in,
     return 0;
   }
 
-  fprintf(stderr, "Unimplemented poll()\n");
+  fputs("Unimplemented poll()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
@@ -2611,14 +2611,14 @@ static cloudabi_errno_t poll_fd(cloudabi_fd_t fd,
                                 cloudabi_event_t *out, size_t nout,
                                 const cloudabi_subscription_t *timeout,
                                 size_t *nevents) {
-  fprintf(stderr, "Unimplemented poll_fd()\n");
+  fputs("Unimplemented poll_fd()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
 static cloudabi_errno_t proc_exec(cloudabi_fd_t fd, const void *data,
                                   size_t datalen, const cloudabi_fd_t *fds,
                                   size_t fdslen) {
-  fprintf(stderr, "Unimplemented proc_exec()\n");
+  fputs("Unimplemented proc_exec()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
