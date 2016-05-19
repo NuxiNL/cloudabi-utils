@@ -2427,19 +2427,50 @@ static cloudabi_errno_t mem_unmap(void *addr, size_t len) {
   return 0;
 }
 
+// Converts a POSIX signal number to a CloudABI signal number.
+static cloudabi_signal_t convert_signal(int sig) {
+  static const cloudabi_signal_t signals[] = {
+#define X(v) [v] = CLOUDABI_##v
+      X(SIGABRT), X(SIGALRM), X(SIGBUS), X(SIGCHLD), X(SIGCONT), X(SIGFPE),
+      X(SIGHUP),  X(SIGILL),  X(SIGINT), X(SIGKILL), X(SIGPIPE), X(SIGQUIT),
+      X(SIGSEGV), X(SIGSTOP), X(SIGSYS), X(SIGTERM), X(SIGTRAP), X(SIGTSTP),
+      X(SIGTTIN), X(SIGTTOU), X(SIGURG), X(SIGUSR1), X(SIGUSR2), X(SIGVTALRM),
+      X(SIGXCPU), X(SIGXFSZ),
+#undef X
+  };
+  if (sig < 0 || sig >= sizeof(signals) / sizeof(signals[0]) ||
+      signals[sig] == 0)
+    return CLOUDABI_SIGABRT;
+  return signals[sig];
+}
+
 static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
                                   cloudabi_signal_t *signal,
                                   cloudabi_exitcode_t *exitcode) {
-#if CONFIG_HAS_PDFORK
-  fprintf(stderr, "Unimplemented pdwait()\n");
-  return CLOUDABI_ENOSYS;
-#else
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, fd, CLOUDABI_RIGHT_POLL_PROC_TERMINATE, 0);
   if (error != 0)
     return error;
 
+#if CONFIG_HAS_PDFORK
+  siginfo_t si;
+  int ret = pdwait(fd_number(fo), &si, nohang ? WNOHANG : 0);
+  if (ret != 0 || si.si_signo != SIGCHLD) {
+    // Error or still running.
+    fd_object_release(fo);
+    return ret == 0 ? CLOUDABI_EAGAIN : convert_errno(ret);
+  }
+  if (si.si_code == CLD_EXITED) {
+    // Process has exited.
+    *signal = 0;
+    *exitcode = si.si_status;
+  } else {
+    // Process has terminated because of a signal.
+    *signal = convert_signal(si.si_status);
+    *exitcode = 0;
+  }
+#else
   // Wait on the process if termination info is not available yet.
   mutex_lock(&fo->process.lock);
   if (!fo->process.terminated) {
@@ -2457,21 +2488,7 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
       fo->process.exitcode = WEXITSTATUS(pstat);
     } else {
       // Process has terminated because of a signal.
-      static const cloudabi_signal_t signals[] = {
-#define X(v) [v] = CLOUDABI_##v
-          X(SIGABRT), X(SIGALRM), X(SIGBUS),  X(SIGCHLD),   X(SIGCONT),
-          X(SIGFPE),  X(SIGHUP),  X(SIGILL),  X(SIGINT),    X(SIGKILL),
-          X(SIGPIPE), X(SIGQUIT), X(SIGSEGV), X(SIGSTOP),   X(SIGSYS),
-          X(SIGTERM), X(SIGTRAP), X(SIGTSTP), X(SIGTTIN),   X(SIGTTOU),
-          X(SIGURG),  X(SIGUSR1), X(SIGUSR2), X(SIGVTALRM), X(SIGXCPU),
-          X(SIGXFSZ),
-#undef X
-      };
-      unsigned int sig = WTERMSIG(pstat);
-      fo->process.signal =
-          sig < sizeof(signals) / sizeof(signals[0]) && signals[sig] != 0
-              ? signals[sig]
-              : CLOUDABI_SIGABRT;
+      fo->process.signal = convert_signal(WTERMSIG(pstat));
       fo->process.exitcode = 0;
     }
     fo->process.terminated = true;
@@ -2479,9 +2496,10 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
   *signal = fo->process.signal;
   *exitcode = fo->process.exitcode;
   mutex_unlock(&fo->process.lock);
+#endif
+
   fd_object_release(fo);
   return 0;
-#endif
 }
 
 static cloudabi_errno_t poll(const cloudabi_subscription_t *in,
