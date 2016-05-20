@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
+#include <time.h>
 
 #ifndef __has_extension
 #define __has_extension(x) 0
@@ -99,6 +100,13 @@ struct LOCKABLE cond {
   pthread_cond_t object;
 };
 
+#ifdef CLOCK_MONOTONIC
+#define HAS_COND_INIT_MONOTONIC 1
+#else
+#define HAS_COND_INIT_MONOTONIC 0
+#endif
+
+#if HAS_COND_INIT_MONOTONIC
 static inline void cond_init_monotonic(struct cond *cond) {
   pthread_condattr_t attr;
   pthread_condattr_init(&attr);
@@ -106,6 +114,7 @@ static inline void cond_init_monotonic(struct cond *cond) {
   pthread_cond_init(&cond->object, &attr);
   pthread_condattr_destroy(&attr);
 }
+#endif
 
 static inline void cond_init_realtime(struct cond *cond) {
   pthread_cond_init(&cond->object, NULL);

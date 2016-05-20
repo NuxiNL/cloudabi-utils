@@ -446,9 +446,11 @@ static cloudabi_errno_t futex_queue_sleep(struct futex_queue *fq,
       .fw_tid = tid, .fw_queue = fq,
   };
   switch (clock_id) {
+#if HAS_COND_INIT_MONOTONIC
     case CLOUDABI_CLOCK_MONOTONIC:
       cond_init_monotonic(&fw.fw_wait);
       break;
+#endif
     case CLOUDABI_CLOCK_REALTIME:
       cond_init_realtime(&fw.fw_wait);
       break;
