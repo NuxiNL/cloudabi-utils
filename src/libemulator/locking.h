@@ -99,6 +99,14 @@ struct LOCKABLE cond {
   pthread_cond_t object;
 };
 
+static inline void cond_init_monotonic(struct cond *cond) {
+  pthread_condattr_t attr;
+  pthread_condattr_init(&attr);
+  pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
+  pthread_cond_init(&cond->object, &attr);
+  pthread_condattr_destroy(&attr);
+}
+
 static inline void cond_init_realtime(struct cond *cond) {
   pthread_cond_init(&cond->object, NULL);
 }
