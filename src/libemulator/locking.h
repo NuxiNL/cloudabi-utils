@@ -99,7 +99,7 @@ struct LOCKABLE cond {
   pthread_cond_t object;
 };
 
-static inline void cond_init(struct cond *cond) {
+static inline void cond_init_realtime(struct cond *cond) {
   pthread_cond_init(&cond->object, NULL);
 }
 

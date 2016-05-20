@@ -452,7 +452,7 @@ static bool futex_queue_sleep(struct futex_queue *fq, struct futex_lock *fl,
   TAILQ_INSERT_TAIL(&fq->fq_list, &fw, fw_next);
   ++fq->fq_count;
 
-  cond_init(&fw.fw_wait);
+  cond_init_realtime(&fw.fw_wait);
   ++fl->fl_waitcount;
 
   futex_lock_assert(fl);
