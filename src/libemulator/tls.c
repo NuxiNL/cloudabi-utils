@@ -17,7 +17,7 @@
 
 static void *tls_get(void) {
   void *tcb;
-  asm volatile("mrs %x0, tpidr_el0" : "=r"(tcb));
+  asm volatile("mrs %0, tpidr_el0" : "=r"(tcb));
   return tcb;
 }
 
