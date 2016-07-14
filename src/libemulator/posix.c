@@ -13,6 +13,7 @@
 #if CONFIG_HAS_PDFORK
 #include <sys/procdesc.h>
 #endif
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -266,8 +267,6 @@ static cloudabi_errno_t clock_res_get(cloudabi_clockid_t clock_id,
     }
 #endif
     case CLOUDABI_CLOCK_PROCESS_CPUTIME_ID:
-      *resolution = 1000000000 / CLOCKS_PER_SEC;
-      return 0;
     case CLOUDABI_CLOCK_REALTIME:
       // The timeval structure provides time in microseconds.
       *resolution = 1000;
@@ -301,13 +300,11 @@ static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
     }
 #endif
     case CLOUDABI_CLOCK_PROCESS_CPUTIME_ID: {
-      struct tms tms;
-      if (times(&tms) == -1)
+      struct rusage usage;
+      if (getrusage(RUSAGE_SELF, &usage) == -1)
         return convert_errno(errno);
-      static_assert(1000000000 / CLOCKS_PER_SEC * CLOCKS_PER_SEC == 1000000000,
-                    "CLOCKS_PER_SEC needs to be a divisor of one billion");
       *time =
-          (cloudabi_timestamp_t)tms.tms_utime * (1000000000 / CLOCKS_PER_SEC);
+          convert_timeval(&usage.ru_utime) + convert_timeval(&usage.ru_stime);
       return 0;
     }
     case CLOUDABI_CLOCK_REALTIME: {
