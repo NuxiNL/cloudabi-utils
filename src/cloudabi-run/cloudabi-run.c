@@ -95,7 +95,7 @@ static const argdata_t *parse_fd(yaml_event_t *event) {
   if (strcmp(value, "stdout") == 0) {
     fd = STDOUT_FILENO;
   } else if (strcmp(value, "stderr") == 0) {
-    fd = STDOUT_FILENO;
+    fd = STDERR_FILENO;
   } else {
     char *endptr;
     errno = 0;
