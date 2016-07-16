@@ -17,7 +17,6 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/times.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #if !CONFIG_HAS_PDFORK
