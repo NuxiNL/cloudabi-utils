@@ -353,22 +353,22 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     sal = sizeof(sun);
   } else {
     // IPv4 or IPv6 socket. Extract address and port number.
-    const char *split, *servname;
+    const char *hostname_start, *hostname_end, *servname;
     if (bindstr[0] == '[') {
-      split = strstr(bindstr, "]:");
-      servname = split + 2;
+      hostname_start = bindstr + 1;
+      hostname_end = strstr(hostname_start, "]:");
+      servname = hostname_end + 2;
     } else {
-      split = strchr(bindstr, ':');
-      servname = split + 1;
+      hostname_start = bindstr;
+      hostname_end = strchr(hostname_start, ':');
+      servname = hostname_end + 1;
     }
-    if (split == NULL)
+    if (hostname_end == NULL)
       exit_parse_error(event, "Address %s does not contain a port number",
                        bindstr);
-    if (bindstr[0] == '[')
-      ++bindstr;
 
     // Resolve address and port number.
-    char *hostname = strndup(bindstr, split - bindstr);
+    char *hostname = strndup(hostname_start, hostname_end - hostname_start);
     struct addrinfo hint = {.ai_family = AF_UNSPEC, .ai_socktype = type};
     int error = getaddrinfo(hostname, servname, &hint, &res);
     free(hostname);
