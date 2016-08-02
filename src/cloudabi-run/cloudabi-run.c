@@ -39,6 +39,7 @@
 #define noreturn _Noreturn
 #endif
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <yaml.h>
 
@@ -291,6 +292,7 @@ static const argdata_t *parse_binary(yaml_event_t *event) {
     *p++ = c2 << 4 | c3 >> 2;
   }
 
+  yaml_event_delete(event);
   return argdata_create_binary(buf, bytes);
 }
 
@@ -346,6 +348,79 @@ static const argdata_t *parse_map(yaml_parser_t *parser) {
 static const argdata_t *parse_null(yaml_event_t *event) {
   yaml_event_delete(event);
   return &argdata_null;
+}
+
+// Parses a number at the beginning of a string for timestamp parsing.
+static int parse_timestamp_number(const char **value, int min, int max) {
+  int result = 0;
+  for (int i = 0; i < max; ++i) {
+    char c = **value;
+    if (c < '0' || c > '9') {
+      if (i < min) {
+        return -1;
+      }
+      break;
+    }
+    result = result * 10 + *(*value)++ - '0';
+  }
+  return result;
+}
+
+// Parses a literal character for timestamp parsing.
+static bool parse_timestamp_char(const char **value, char c) {
+  if (**value == c) {
+    ++*value;
+    return true;
+  }
+  return false;
+}
+
+// Parses a timestamp value.
+static const argdata_t *parse_timestamp(yaml_event_t *event) {
+  const char *value = (const char *)event->data.scalar.value;
+  const char *value_end = value + event->data.scalar.length;
+
+  // Parse the date.
+  struct tm tm = {};
+  if ((tm.tm_year = parse_timestamp_number(&value, 4, 4)) < 0 ||
+      !parse_timestamp_char(&value, '-') ||
+      (tm.tm_mon = parse_timestamp_number(&value, 1, 2)) < 0 ||
+      !parse_timestamp_char(&value, '-') ||
+      (tm.tm_mday = parse_timestamp_number(&value, 1, 2)) < 0)
+    return NULL;
+  tm.tm_year -= 1900;
+  --tm.tm_mon;
+
+  if (value != value_end || event->data.scalar.length != 10) {
+    // Parse the time separator.
+    if (!parse_timestamp_char(&value, 't') &&
+        !parse_timestamp_char(&value, 'T')) {
+      bool gotspace = false;
+      while (parse_timestamp_char(&value, ' ') ||
+             parse_timestamp_char(&value, '\t'))
+        gotspace = true;
+      if (!gotspace)
+        return NULL;
+    }
+
+    // Parse the time.
+    if ((tm.tm_hour = parse_timestamp_number(&value, 1, 2)) < 0 ||
+        !parse_timestamp_char(&value, ':') ||
+        (tm.tm_min = parse_timestamp_number(&value, 2, 2)) < 0 ||
+        !parse_timestamp_char(&value, ':') ||
+        (tm.tm_sec = parse_timestamp_number(&value, 2, 2)) < 0)
+      return NULL;
+
+    // TODO(ed): Make fractional time and time zones work.
+
+    // Disallow trailing garbage.
+    if (value != value_end)
+      return NULL;
+  }
+
+  struct timespec ts = {.tv_sec = timegm(&tm)};
+  yaml_event_delete(event);
+  return argdata_create_timestamp(&ts);
 }
 
 // Parses a sequence.
@@ -522,6 +597,12 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
         return ret;
       } else if (strcmp(tag, YAML_NULL_TAG) == 0) {
         return parse_null(&event);
+      } else if (strcmp(tag, "tag:yaml.org,2002:timestamp") == 0) {
+        const argdata_t *ret = parse_timestamp(&event);
+        if (ret == NULL)
+          exit_parse_error(&event, "Invalid timestamp value: %s",
+                           (const char *)event.data.scalar.value);
+        return ret;
       } else if (strcmp(tag, TAG_PREFIX "fd") == 0) {
         return parse_fd(&event);
       } else {
