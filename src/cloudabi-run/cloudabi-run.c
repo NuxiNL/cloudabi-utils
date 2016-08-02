@@ -169,6 +169,7 @@ static const argdata_t *parse_float(yaml_event_t *event) {
     if (errno != 0 || endptr != value_end)
       return NULL;
   }
+  yaml_event_delete(event);
   return argdata_create_float(fpvalue);
 }
 
