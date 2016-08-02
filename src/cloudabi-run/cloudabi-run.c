@@ -78,14 +78,30 @@ static noreturn void exit_parse_error(const yaml_event_t *event,
 // Parses a boolean value.
 static const argdata_t *parse_bool(yaml_event_t *event) {
   const char *value = (const char *)event->data.scalar.value;
-  if (strcmp(value, "true") == 0) {
-    yaml_event_delete(event);
-    return &argdata_true;
+  size_t length = event->data.scalar.length;
+
+  // All valid 'true' keywords.
+  for (const char *w = "y\0Y\0yes\0Yes\0YES\0true\0True\0TRUE\0on\0On\0ON\0";
+       *w != '\0';) {
+    size_t w_length = strlen(w);
+    if (length == w_length && memcmp(value, w, w_length) == 0) {
+      yaml_event_delete(event);
+      return &argdata_true;
+    }
+    w += w_length + 1;
   }
-  if (strcmp(value, "false") == 0) {
-    yaml_event_delete(event);
-    return &argdata_false;
+
+  // All valid 'false' keywords.
+  for (const char *w = "n\0N\0no\0No\0NO\0false\0False\0FALSE\0off\0Off\0OFF\0";
+       *w != '\0';) {
+    size_t w_length = strlen(w);
+    if (length == w_length && memcmp(value, w, w_length) == 0) {
+      yaml_event_delete(event);
+      return &argdata_false;
+    }
+    w += w_length + 1;
   }
+
   return NULL;
 }
 
