@@ -391,6 +391,7 @@ static const argdata_t *parse_timestamp(yaml_event_t *event) {
   tm.tm_year -= 1900;
   --tm.tm_mon;
 
+  struct timespec ts = {};
   if (value != value_end || event->data.scalar.length != 10) {
     // Parse the time separator.
     if (!parse_timestamp_char(&value, 't') &&
@@ -411,14 +412,46 @@ static const argdata_t *parse_timestamp(yaml_event_t *event) {
         (tm.tm_sec = parse_timestamp_number(&value, 2, 2)) < 0)
       return NULL;
 
-    // TODO(ed): Make fractional time and time zones work.
+    // Parse fractional seconds.
+    if (parse_timestamp_char(&value, '.')) {
+      unsigned long multiplier = 100000000;
+      while (*value >= '0' && *value <= '9') {
+        ts.tv_nsec += (*value++ - '0') * multiplier;
+        multiplier /= 10;
+      }
+    }
+
+    // Allow whitespace between the time and the time zone.
+    while (parse_timestamp_char(&value, ' ') ||
+           parse_timestamp_char(&value, '\t'))
+      ;
+
+    // Parse the time zone offset.
+    bool tz_negative;
+    if ((tz_negative = parse_timestamp_char(&value, '-')) ||
+        parse_timestamp_char(&value, '+')) {
+      int tz_hour, tz_min = 0;
+      if ((tz_hour = parse_timestamp_number(&value, 1, 2)) < 0 ||
+          (parse_timestamp_char(&value, ':') &&
+           (tz_min = parse_timestamp_number(&value, 2, 2)) < 0))
+        return NULL;
+      if (tz_negative) {
+        tm.tm_hour += tz_hour;
+        tm.tm_min += tz_min;
+      } else {
+        tm.tm_hour -= tz_hour;
+        tm.tm_min -= tz_min;
+      }
+    } else {
+      parse_timestamp_char(&value, 'Z');
+    }
 
     // Disallow trailing garbage.
     if (value != value_end)
       return NULL;
   }
 
-  struct timespec ts = {.tv_sec = timegm(&tm)};
+  ts.tv_sec = timegm(&tm);
   yaml_event_delete(event);
   return argdata_create_timestamp(&ts);
 }
