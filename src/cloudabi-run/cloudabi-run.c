@@ -364,6 +364,8 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     if (split == NULL)
       exit_parse_error(event, "Address %s does not contain a port number",
                        bindstr);
+    if (bindstr[0] == '[')
+      ++bindstr;
 
     // Resolve address and port number.
     char *hostname = strndup(bindstr, split - bindstr);
