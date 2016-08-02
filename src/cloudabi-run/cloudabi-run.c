@@ -171,6 +171,10 @@ static const argdata_t *parse_file(const yaml_event_t *event,
 // Parses a floating point value.
 static const argdata_t *parse_float(yaml_event_t *event) {
   const char *value = (const char *)event->data.scalar.value;
+  const char *value_end = value + event->data.scalar.length;
+  if (value == value_end)
+    return NULL;
+
   double fpvalue;
   if (strcmp(value, ".inf") == 0) {
     fpvalue = INFINITY;
@@ -179,7 +183,6 @@ static const argdata_t *parse_float(yaml_event_t *event) {
   } else if (strcmp(value, ".nan") == 0) {
     fpvalue = NAN;
   } else {
-    const char *value_end = value + event->data.scalar.length;
     char *endptr;
     errno = 0;
     fpvalue = strtod(value, &endptr);
@@ -194,6 +197,8 @@ static const argdata_t *parse_float(yaml_event_t *event) {
 static const argdata_t *parse_int(yaml_event_t *event) {
   const char *value = (const char *)event->data.scalar.value;
   const char *value_end = value + event->data.scalar.length;
+  if (value == value_end)
+    return NULL;
 
   // Determine the base of the number.
   int base;
@@ -333,8 +338,22 @@ static const argdata_t *parse_map(yaml_parser_t *parser) {
 
 // Parses a null value.
 static const argdata_t *parse_null(yaml_event_t *event) {
-  yaml_event_delete(event);
-  return &argdata_null;
+  const char *value = (const char *)event->data.scalar.value;
+  size_t length = event->data.scalar.length;
+
+  // All valid 'null' keywords.
+  for (const char *w = "~\0null\0Null\0NULL\0~\0";;) {
+    size_t w_length = strlen(w);
+    if (length == w_length && memcmp(value, w, w_length) == 0) {
+      yaml_event_delete(event);
+      return &argdata_null;
+    }
+    if (w_length == 0)
+      break;
+    w += w_length + 1;
+  }
+
+  return NULL;
 }
 
 // Parses a number at the beginning of a string for timestamp parsing.
@@ -445,13 +464,6 @@ static const argdata_t *parse_timestamp(yaml_event_t *event) {
 // Parses an unquoted string that doesn't have a tag associated with it.
 // This means that we'll need to infer its type.
 static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
-  // Potential null value?
-  const char *value = (const char *)event->data.scalar.value;
-  if (strcmp(value, "null") == 0) {
-    yaml_event_delete(event);
-    return &argdata_null;
-  }
-
   // Potential boolean value?
   const argdata_t *ret = parse_bool(event);
   if (ret != NULL)
@@ -464,6 +476,11 @@ static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
 
   // Potential floating point value?
   ret = parse_float(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential null value?
+  ret = parse_null(event);
   if (ret != NULL)
     return ret;
 
@@ -649,7 +666,8 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
                            (const char *)event.data.scalar.value);
         return ret;
       } else if (strcmp(tag, YAML_NULL_TAG) == 0) {
-        return parse_null(&event);
+        yaml_event_delete(&event);
+        return &argdata_null;
       } else if (strcmp(tag, "tag:yaml.org,2002:timestamp") == 0) {
         const argdata_t *ret = parse_timestamp(&event);
         if (ret == NULL)
