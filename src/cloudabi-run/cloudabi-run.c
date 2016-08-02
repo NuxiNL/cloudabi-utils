@@ -84,7 +84,7 @@ static const argdata_t *parse_bool(yaml_event_t *event) {
     yaml_event_delete(event);
     return &argdata_false;
   }
-  exit_parse_error(event, "Unknown boolean value: %s", value);
+  return NULL;
 }
 
 // Parses a file descriptor number.
@@ -102,7 +102,7 @@ static const argdata_t *parse_fd(yaml_event_t *event) {
     fd = strtoul(value, &endptr, 10);
     if (errno != 0 || endptr != value + event->data.scalar.length ||
         fd > INT_MAX)
-      exit_parse_error(event, "Invalid file descriptor number");
+      exit_parse_error(event, "Invalid file descriptor number: %s", value);
   }
 
   // Validate that this descriptor actually exists. program_exec() does
@@ -187,8 +187,37 @@ static const argdata_t *parse_int(yaml_event_t *event) {
       return argdata_create_int(uintval);
   }
 
-  // Integer value out of bounds.
-  exit_parse_error(event, "Invalid integer value");
+  return NULL;
+}
+
+// Parses a string value.
+static const argdata_t *parse_str(const yaml_event_t *event) {
+  return argdata_create_str((const char *)event->data.scalar.value,
+                            event->data.scalar.length);
+}
+
+// Parses an unquoted string that doesn't have a tag associated with it.
+// This means that we'll need to infer its type.
+static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
+  // Potential null value?
+  const char *value = (const char *)event->data.scalar.value;
+  if (strcmp(value, "null") == 0) {
+    yaml_event_delete(event);
+    return &argdata_null;
+  }
+
+  // Potential boolean value?
+  const argdata_t *ret = parse_bool(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential integer value?
+  ret = parse_int(event);
+  if (ret != NULL)
+    return ret;
+
+  // Fall back to interpreting it as a plain string value.
+  return parse_str(event);
 }
 
 // Parses a map.
@@ -362,13 +391,22 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
       }
       yaml_event_delete(&event);
     case YAML_SCALAR_EVENT:
-      if (tag == NULL || strcmp(tag, YAML_STR_TAG) == 0) {
-        return argdata_create_str((const char *)event.data.scalar.value,
-                                  event.data.scalar.length);
+      if (event.data.scalar.plain_implicit) {
+        return parse_str_autodetect(&event);
+      } else if (tag == NULL || strcmp(tag, YAML_STR_TAG) == 0) {
+        return parse_str(&event);
       } else if (strcmp(tag, YAML_BOOL_TAG) == 0) {
-        return parse_bool(&event);
+        const argdata_t *ret = parse_bool(&event);
+        if (ret == NULL)
+          exit_parse_error(&event, "Invalid boolean value: %s",
+                           (const char *)event.data.scalar.value);
+        return ret;
       } else if (strcmp(tag, YAML_INT_TAG) == 0) {
-        return parse_int(&event);
+        const argdata_t *ret = parse_int(&event);
+        if (ret == NULL)
+          exit_parse_error(&event, "Invalid integer value: %s",
+                           (const char *)event.data.scalar.value);
+        return ret;
       } else if (strcmp(tag, YAML_NULL_TAG) == 0) {
         return parse_null(&event);
       } else if (strcmp(tag, TAG_PREFIX "fd") == 0) {
