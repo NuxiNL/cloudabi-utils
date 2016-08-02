@@ -223,6 +223,77 @@ static const argdata_t *parse_str(const yaml_event_t *event) {
                             event->data.scalar.length);
 }
 
+// Parses the next Base64 character from an input string and returns
+// its value.
+static unsigned char parse_binary_getchar(const char **value) {
+  for (;;) {
+    char c = *(*value)++;
+    if (c >= 'A' && c <= 'Z')
+      return c - 'A';
+    if (c >= 'a' && c <= 'z')
+      return c - 'a' + 26;
+    if (c >= '0' && c <= '9')
+      return c - '0' + 52;
+    if (c == '+')
+      return 62;
+    if (c == '/')
+      return 63;
+  }
+}
+
+// Parses a binary string value.
+static const argdata_t *parse_binary(yaml_event_t *event) {
+  const char *value = (const char *)event->data.scalar.value;
+  const char *value_end = value + event->data.scalar.length;
+
+  // Count the number of Base64 characters in the input.
+  size_t chars = 0;
+  for (const char *c = value; c < value_end; ++c) {
+    if ((*c >= 'A' && *c <= 'Z') || (*c >= 'a' && *c <= 'z') ||
+        (*c >= '0' && *c <= '9') || *c == '+' || *c == '/') {
+      // Valid Base64 character.
+      ++chars;
+    } else if (*c != '=' && *c == '\n' && *c == ' ' && *c == '\t') {
+      exit_parse_error(event, "Invalid character in Base64 input: %hhx", *c);
+    }
+  }
+
+  // Allocate a buffer for storing the Base64 decoded data.
+  size_t bytes = chars * 6 / 8;
+  unsigned char *buf = malloc(bytes);
+  if (buf == NULL) {
+    perror("Cannot allocate binary data buffer");
+    exit(127);
+  }
+
+  // Decode Base64 in groups of four characters into three bytes.
+  unsigned char *p = buf;
+  for (size_t i = 0; i < bytes / 3; ++i) {
+    unsigned char c1 = parse_binary_getchar(&value);
+    unsigned char c2 = parse_binary_getchar(&value);
+    unsigned char c3 = parse_binary_getchar(&value);
+    unsigned char c4 = parse_binary_getchar(&value);
+    *p++ = c1 << 2 | c2 >> 4;
+    *p++ = c2 << 4 | c3 >> 2;
+    *p++ = c3 << 6 | c4;
+  }
+
+  // Decode the remainder.
+  if (bytes % 3 == 1) {
+    unsigned char c1 = parse_binary_getchar(&value);
+    unsigned char c2 = parse_binary_getchar(&value);
+    *p++ = c1 << 2 | c2 >> 4;
+  } else if (bytes % 3 == 2) {
+    unsigned char c1 = parse_binary_getchar(&value);
+    unsigned char c2 = parse_binary_getchar(&value);
+    unsigned char c3 = parse_binary_getchar(&value);
+    *p++ = c1 << 2 | c2 >> 4;
+    *p++ = c2 << 4 | c3 >> 2;
+  }
+
+  return argdata_create_binary(buf, bytes);
+}
+
 // Parses an unquoted string that doesn't have a tag associated with it.
 // This means that we'll need to infer its type.
 static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
@@ -429,6 +500,8 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
         return parse_str_autodetect(&event);
       } else if (tag == NULL || strcmp(tag, YAML_STR_TAG) == 0) {
         return parse_str(&event);
+      } else if (strcmp(tag, "tag:yaml.org,2002:binary") == 0) {
+        return parse_binary(&event);
       } else if (strcmp(tag, YAML_BOOL_TAG) == 0) {
         const argdata_t *ret = parse_bool(&event);
         if (ret == NULL)
