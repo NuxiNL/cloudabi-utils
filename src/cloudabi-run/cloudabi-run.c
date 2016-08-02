@@ -327,9 +327,8 @@ static int parse_timestamp_number(const char **value, int min, int max) {
   for (int i = 0; i < max; ++i) {
     char c = **value;
     if (c < '0' || c > '9') {
-      if (i < min) {
+      if (i < min)
         return -1;
-      }
       break;
     }
     result = result * 10 + *(*value)++ - '0';
