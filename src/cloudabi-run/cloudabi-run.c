@@ -28,6 +28,7 @@
 #endif
 #include <inttypes.h>
 #include <limits.h>
+#include <math.h>
 #include <netdb.h>
 #include <program.h>
 #include <stdarg.h>
@@ -150,6 +151,27 @@ static const argdata_t *parse_file(const yaml_event_t *event,
   return argdata_create_fd(fd);
 }
 
+// Parses a floating point value.
+static const argdata_t *parse_float(yaml_event_t *event) {
+  const char *value = (const char *)event->data.scalar.value;
+  double fpvalue;
+  if (strcmp(value, ".inf") == 0) {
+    fpvalue = INFINITY;
+  } else if (strcmp(value, "-.inf") == 0) {
+    fpvalue = -INFINITY;
+  } else if (strcmp(value, ".nan") == 0) {
+    fpvalue = NAN;
+  } else {
+    const char *value_end = value + event->data.scalar.length;
+    char *endptr;
+    errno = 0;
+    fpvalue = strtod(value, &endptr);
+    if (errno != 0 || endptr != value_end)
+      return NULL;
+  }
+  return argdata_create_float(fpvalue);
+}
+
 // Parses an integer value.
 static const argdata_t *parse_int(yaml_event_t *event) {
   const char *value = (const char *)event->data.scalar.value;
@@ -173,8 +195,10 @@ static const argdata_t *parse_int(yaml_event_t *event) {
     char *endptr;
     errno = 0;
     intval = strtoimax(value, &endptr, base);
-    if (errno == 0 && endptr == value_end)
+    if (errno == 0 && endptr == value_end) {
+      yaml_event_delete(event);
       return argdata_create_int(intval);
+    }
   }
 
   // Try unsigned integer conversion.
@@ -183,8 +207,10 @@ static const argdata_t *parse_int(yaml_event_t *event) {
     char *endptr;
     errno = 0;
     uintval = strtoumax(value, &endptr, base);
-    if (errno == 0 && endptr == value_end)
+    if (errno == 0 && endptr == value_end) {
+      yaml_event_delete(event);
       return argdata_create_int(uintval);
+    }
   }
 
   return NULL;
@@ -213,6 +239,11 @@ static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
 
   // Potential integer value?
   ret = parse_int(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential floating point value?
+  ret = parse_float(event);
   if (ret != NULL)
     return ret;
 
@@ -399,6 +430,12 @@ static const argdata_t *parse_object(yaml_parser_t *parser) {
         const argdata_t *ret = parse_bool(&event);
         if (ret == NULL)
           exit_parse_error(&event, "Invalid boolean value: %s",
+                           (const char *)event.data.scalar.value);
+        return ret;
+      } else if (strcmp(tag, YAML_FLOAT_TAG) == 0) {
+        const argdata_t *ret = parse_float(&event);
+        if (ret == NULL)
+          exit_parse_error(&event, "Invalid floating point value: %s",
                            (const char *)event.data.scalar.value);
         return ret;
       } else if (strcmp(tag, YAML_INT_TAG) == 0) {
