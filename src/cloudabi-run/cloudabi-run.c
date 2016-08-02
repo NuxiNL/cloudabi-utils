@@ -296,35 +296,6 @@ static const argdata_t *parse_binary(yaml_event_t *event) {
   return argdata_create_binary(buf, bytes);
 }
 
-// Parses an unquoted string that doesn't have a tag associated with it.
-// This means that we'll need to infer its type.
-static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
-  // Potential null value?
-  const char *value = (const char *)event->data.scalar.value;
-  if (strcmp(value, "null") == 0) {
-    yaml_event_delete(event);
-    return &argdata_null;
-  }
-
-  // Potential boolean value?
-  const argdata_t *ret = parse_bool(event);
-  if (ret != NULL)
-    return ret;
-
-  // Potential integer value?
-  ret = parse_int(event);
-  if (ret != NULL)
-    return ret;
-
-  // Potential floating point value?
-  ret = parse_float(event);
-  if (ret != NULL)
-    return ret;
-
-  // Fall back to interpreting it as a plain string value.
-  return parse_str(event);
-}
-
 // Parses a map.
 static const argdata_t *parse_map(yaml_parser_t *parser) {
   const argdata_t **keys = NULL, **values = NULL;
@@ -454,6 +425,40 @@ static const argdata_t *parse_timestamp(yaml_event_t *event) {
   ts.tv_sec = timegm(&tm);
   yaml_event_delete(event);
   return argdata_create_timestamp(&ts);
+}
+
+// Parses an unquoted string that doesn't have a tag associated with it.
+// This means that we'll need to infer its type.
+static const argdata_t *parse_str_autodetect(yaml_event_t *event) {
+  // Potential null value?
+  const char *value = (const char *)event->data.scalar.value;
+  if (strcmp(value, "null") == 0) {
+    yaml_event_delete(event);
+    return &argdata_null;
+  }
+
+  // Potential boolean value?
+  const argdata_t *ret = parse_bool(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential integer value?
+  ret = parse_int(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential floating point value?
+  ret = parse_float(event);
+  if (ret != NULL)
+    return ret;
+
+  // Potential timestamp value?
+  ret = parse_timestamp(event);
+  if (ret != NULL)
+    return ret;
+
+  // Fall back to interpreting it as a plain string value.
+  return parse_str(event);
 }
 
 // Parses a sequence.
