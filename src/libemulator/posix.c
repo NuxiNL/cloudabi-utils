@@ -3132,11 +3132,6 @@ static void thread_exit(_Atomic(cloudabi_lock_t) * lock,
   pthread_exit(NULL);
 }
 
-static cloudabi_errno_t thread_tcb_set(void *tcb) {
-  // This system call is deprecated and cannot be emulated safely.
-  return CLOUDABI_ENOSYS;
-}
-
 static cloudabi_errno_t thread_yield(void) {
   if (sched_yield() < 0)
     return convert_errno(errno);
