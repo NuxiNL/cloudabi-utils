@@ -57,6 +57,8 @@
 #include "tidpool.h"
 #include "tls.h"
 
+#include "../libcloudabi/numeric_limits.h"
+
 // struct iovec must have the same layout as cloudabi_iovec_t.
 static_assert(offsetof(struct iovec, iov_base) ==
                   offsetof(cloudabi_iovec_t, iov_base),
@@ -2012,8 +2014,7 @@ static void convert_timestamp(cloudabi_timestamp_t in, struct timespec *out) {
   in /= 1000000000;
 
   // Clamp to the maximum in case it would overflow our system's time_t.
-  time_t max = _Generic((time_t)0, int32_t : INT32_MAX, int64_t : INT64_MAX);
-  out->tv_sec = in < max ? in : max;
+  out->tv_sec = in < NUMERIC_MAX(time_t) ? in : NUMERIC_MAX(time_t);
 }
 
 #if HAS_UTIMENS

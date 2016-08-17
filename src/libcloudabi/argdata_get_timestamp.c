@@ -10,6 +10,7 @@
 #include <time.h>
 
 #include "argdata_impl.h"
+#include "numeric_limits.h"
 #include "overflow.h"
 
 int argdata_get_timestamp(const argdata_t *ad, struct timespec *value) {
@@ -58,12 +59,9 @@ int argdata_get_timestamp(const argdata_t *ad, struct timespec *value) {
 
       // Store result in struct timespec.
       int64_t sec;
-      // clang-format off
-      if (add_overflow(high << 32, low, &sec) ||
-          sec < _Generic((time_t)0, int32_t: INT32_MIN, int64_t: INT64_MIN) ||
-          sec > _Generic((time_t)0, int32_t: INT32_MAX, int64_t: INT64_MAX))
+      if (add_overflow(high << 32, low, &sec) || sec < NUMERIC_MIN(time_t) ||
+          sec > NUMERIC_MAX(time_t))
         return ERANGE;
-      // clang-format on
       *value = (struct timespec){.tv_sec = sec, .tv_nsec = nsec};
       return 0;
     }
