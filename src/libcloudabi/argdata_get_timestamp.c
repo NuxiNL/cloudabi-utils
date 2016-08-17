@@ -6,6 +6,7 @@
 #include <argdata.h>
 #include <assert.h>
 #include <errno.h>
+#include <stdint.h>
 #include <time.h>
 
 #include "argdata_impl.h"
@@ -56,11 +57,14 @@ int argdata_get_timestamp(const argdata_t *ad, struct timespec *value) {
       low /= 1000000000;
 
       // Store result in struct timespec.
-      static_assert(sizeof(time_t) == sizeof(int64_t),
-                    "Timestamp not the right size");
-      if (add_overflow(high << 32, low, &value->tv_sec))
+      int64_t sec;
+      // clang-format off
+      if (add_overflow(high << 32, low, &sec) ||
+          sec < _Generic((time_t)0, int32_t: INT32_MIN, int64_t: INT64_MIN) ||
+          sec > _Generic((time_t)0, int32_t: INT32_MAX, int64_t: INT64_MAX))
         return ERANGE;
-      value->tv_nsec = nsec;
+      // clang-format on
+      *value = (struct timespec){.tv_sec = sec, .tv_nsec = nsec};
       return 0;
     }
     default:

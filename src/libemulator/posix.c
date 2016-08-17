@@ -2007,11 +2007,13 @@ static cloudabi_errno_t file_stat_fget(cloudabi_fd_t fd,
 }
 
 static void convert_timestamp(cloudabi_timestamp_t in, struct timespec *out) {
-  static_assert(sizeof(out->tv_sec) >= sizeof(in),
-                "Timestamp may get truncated");
-  *out = (struct timespec){
-      .tv_sec = in / 1000000000, .tv_nsec = in % 1000000000,
-  };
+  // Store sub-second remainder.
+  out->tv_nsec = in % 1000000000;
+  in /= 1000000000;
+
+  // Clamp to the maximum in case it would overflow our system's time_t.
+  time_t max = _Generic((time_t)0, int32_t : INT32_MAX, int64_t : INT64_MAX);
+  out->tv_sec = in < max ? in : max;
 }
 
 #if HAS_UTIMENS
