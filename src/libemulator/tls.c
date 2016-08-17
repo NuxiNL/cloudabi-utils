@@ -25,6 +25,18 @@ static void tls_set(const void *tcb) {
   asm volatile("msr tpidr_el0, %0" : : "r"(tcb));
 }
 
+#elif defined(__i386__)
+
+static void *tls_get(void) {
+  void *tcb;
+  asm volatile("mov %%gs:0, %0" : "=r"(tcb));
+  return tcb;
+}
+
+static void tls_set(const void *tcb) {
+  asm volatile("mov %0, %%gs:0" : : "r"(tcb));
+}
+
 #elif defined(__x86_64__) && CONFIG_TLS_USE_GSBASE
 
 // Signal handler for when code tries to use %fs.

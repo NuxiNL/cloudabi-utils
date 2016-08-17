@@ -68,6 +68,8 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
       ehdr.e_ident[EI_OSABI] != ELFOSABI_CLOUDABI || ehdr.e_type != ET_DYN ||
 #if defined(__aarch64__)
       ehdr.e_machine != EM_AARCH64
+#elif defined(__i386__)
+      ehdr.e_machine != EM_386
 #elif defined(__x86_64__)
       ehdr.e_machine != EM_X86_64
 #else

@@ -45,6 +45,7 @@ typedef struct {
 
 #define ET_DYN 3
 
+#define EM_386 3
 #define EM_X86_64 62
 #define EM_AARCH64 183
 
