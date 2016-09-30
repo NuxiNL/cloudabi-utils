@@ -703,7 +703,7 @@ static noreturn void usage(void) {
 int main(int argc, char *argv[]) {
   // Parse command line options.
   bool do_emulate = false;
-  char c;
+  int c;
   while ((c = getopt(argc, argv, "e")) != -1) {
     switch (c) {
       case 'e':
