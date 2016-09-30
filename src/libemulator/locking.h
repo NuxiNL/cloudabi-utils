@@ -6,6 +6,8 @@
 #ifndef LOCKING_H
 #define LOCKING_H
 
+#include "config.h"
+
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
@@ -100,7 +102,7 @@ struct LOCKABLE cond {
   pthread_cond_t object;
 };
 
-#ifdef CLOCK_MONOTONIC
+#if CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
 #define HAS_COND_INIT_MONOTONIC 1
 #else
 #define HAS_COND_INIT_MONOTONIC 0

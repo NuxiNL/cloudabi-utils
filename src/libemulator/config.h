@@ -97,6 +97,12 @@
 #endif
 
 #ifndef __APPLE__
+#define CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK 1
+#else
+#define CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK 0
+#endif
+
+#ifndef __APPLE__
 #define CONFIG_HAS_PWRITEV 1
 #else
 #define CONFIG_HAS_PWRITEV 0
