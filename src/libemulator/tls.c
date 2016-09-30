@@ -25,6 +25,18 @@ static void tls_set(const void *tcb) {
   asm volatile("msr tpidr_el0, %0" : : "r"(tcb));
 }
 
+#elif defined(__arm__)
+
+static void *tls_get(void) {
+  void *tcb;
+  asm volatile("mrc p15, 0, %0, cr13, cr0, 2" : "=r"(tcb));
+  return tcb;
+}
+
+static void tls_set(const void *tcb) {
+  asm volatile("mcr p15, 0, %0, cr13, cr0, 2" : : "r"(tcb));
+}
+
 #elif defined(__i386__)
 
 static void *tls_get(void) {
