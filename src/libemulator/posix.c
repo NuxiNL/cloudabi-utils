@@ -25,6 +25,7 @@
 
 #include <netinet/in.h>
 
+// TODO(ed): This code is no longer needed as of macOS Sierra.
 #if CONFIG_HAS_MACH_ABSOLUTE_TIME
 #include <mach/mach_time.h>
 #endif
@@ -249,6 +250,8 @@ static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
 }
 
 #else
+
+// TODO(ed): This code is no longer needed as of macOS Sierra.
 
 static cloudabi_errno_t clock_res_get(cloudabi_clockid_t clock_id,
                                       cloudabi_timestamp_t *resolution) {

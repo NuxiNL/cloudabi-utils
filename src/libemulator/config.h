@@ -66,6 +66,7 @@
 #define CONFIG_HAS_ISATTY 0
 #endif
 
+// TODO(ed): This code is no longer needed as of macOS Sierra.
 #ifdef __APPLE__
 #define CONFIG_HAS_MACH_ABSOLUTE_TIME 1
 #else
