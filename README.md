@@ -52,7 +52,7 @@ descriptors that are not referenced from the argument data structure are
 never leaked into new processes, `program_exec()` depends on a small
 proxy executable called `cloudabi-reexec`. This package ships with
 prebuilt copies that were built by the
-[CloudABI Ports Collection](https://github.com/NuxiNL/cloudabi-ports/tree/master/packages/cloudabi-reexec).
+[CloudABI Ports Collection](https://github.com/NuxiNL/cloudabi-ports/tree/master/packages/cloudabi-utils).
 
 Finally, this package provides the `cloudabi-run` utility, which is
 built on top of `libcloudabi`. This utility reads a YAML file from
