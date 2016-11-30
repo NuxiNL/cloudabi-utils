@@ -25,11 +25,6 @@
 
 #include <netinet/in.h>
 
-// TODO(ed): This code is no longer needed as of macOS Sierra.
-#if CONFIG_HAS_MACH_ABSOLUTE_TIME
-#include <mach/mach_time.h>
-#endif
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
@@ -202,8 +197,6 @@ static cloudabi_timestamp_t convert_timespec(const struct timespec *ts) {
   return (cloudabi_timestamp_t)ts->tv_sec * 1000000000 + ts->tv_nsec;
 }
 
-#ifdef CLOCK_REALTIME
-
 // Converts a CloudABI clock identifier to a POSIX clock identifier.
 static bool convert_clockid(cloudabi_clockid_t in, clockid_t *out) {
   switch (in) {
@@ -248,82 +241,6 @@ static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
   *time = convert_timespec(&ts);
   return 0;
 }
-
-#else
-
-// TODO(ed): This code is no longer needed as of macOS Sierra.
-
-static cloudabi_errno_t clock_res_get(cloudabi_clockid_t clock_id,
-                                      cloudabi_timestamp_t *resolution) {
-  switch (clock_id) {
-#if CONFIG_HAS_MACH_ABSOLUTE_TIME
-    case CLOUDABI_CLOCK_MONOTONIC: {
-      // Compute resolution based on mach_timebase_info()'s data once.
-      static cloudabi_timestamp_t monotonic_resolution;
-      if (monotonic_resolution == 0) {
-        mach_timebase_info_data_t timebase;
-        mach_timebase_info(&timebase);
-        cloudabi_timestamp_t res = timebase.numer / timebase.denom;
-        monotonic_resolution = res > 0 ? res : 1;
-      }
-      *resolution = monotonic_resolution;
-      return 0;
-    }
-#endif
-    case CLOUDABI_CLOCK_PROCESS_CPUTIME_ID:
-    case CLOUDABI_CLOCK_REALTIME:
-      // The timeval structure provides time in microseconds.
-      *resolution = 1000;
-      return 0;
-    default:
-      return CLOUDABI_EINVAL;
-  }
-}
-
-// Converts a POSIX timeval to a CloudABI timestamp.
-static cloudabi_timestamp_t convert_timeval(const struct timeval *tv) {
-  if (tv->tv_sec < 0)
-    return 0;
-  if (tv->tv_sec >= UINT64_MAX / 1000000000)
-    return UINT64_MAX;
-  return (cloudabi_timestamp_t)tv->tv_sec * 1000000000 + tv->tv_usec * 1000;
-}
-
-static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
-                                       cloudabi_timestamp_t precision,
-                                       cloudabi_timestamp_t *time) {
-  switch (clock_id) {
-#if CONFIG_HAS_MACH_ABSOLUTE_TIME
-    case CLOUDABI_CLOCK_MONOTONIC: {
-      uint64_t ticks = mach_absolute_time();
-      static mach_timebase_info_data_t timebase;
-      if (timebase.denom == 0)
-        mach_timebase_info(&timebase);
-      *time = ticks * timebase.numer / timebase.denom;
-      return 0;
-    }
-#endif
-    case CLOUDABI_CLOCK_PROCESS_CPUTIME_ID: {
-      struct rusage usage;
-      if (getrusage(RUSAGE_SELF, &usage) == -1)
-        return convert_errno(errno);
-      *time =
-          convert_timeval(&usage.ru_utime) + convert_timeval(&usage.ru_stime);
-      return 0;
-    }
-    case CLOUDABI_CLOCK_REALTIME: {
-      struct timeval tv;
-      if (gettimeofday(&tv, NULL) < 0)
-        return convert_errno(errno);
-      *time = convert_timeval(&tv);
-      return 0;
-    }
-    default:
-      return CLOUDABI_EINVAL;
-  }
-}
-
-#endif
 
 static cloudabi_errno_t condvar_signal(_Atomic(cloudabi_condvar_t) * condvar,
                                        cloudabi_scope_t scope,
