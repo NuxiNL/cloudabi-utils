@@ -57,32 +57,32 @@
 
 // struct iovec must have the same layout as cloudabi_iovec_t.
 static_assert(offsetof(struct iovec, iov_base) ==
-                  offsetof(cloudabi_iovec_t, iov_base),
+                  offsetof(cloudabi_iovec_t, buf),
               "Offset mismatch");
 static_assert(sizeof(((struct iovec *)0)->iov_base) ==
-                  sizeof(((cloudabi_iovec_t *)0)->iov_base),
+                  sizeof(((cloudabi_iovec_t *)0)->buf),
               "Size mismatch");
 static_assert(offsetof(struct iovec, iov_len) ==
-                  offsetof(cloudabi_iovec_t, iov_len),
+                  offsetof(cloudabi_iovec_t, buf_len),
               "Offset mismatch");
 static_assert(sizeof(((struct iovec *)0)->iov_len) ==
-                  sizeof(((cloudabi_iovec_t *)0)->iov_len),
+                  sizeof(((cloudabi_iovec_t *)0)->buf_len),
               "Size mismatch");
 static_assert(sizeof(struct iovec) == sizeof(cloudabi_iovec_t),
               "Size mismatch");
 
 // struct iovec must have the same layout as cloudabi_ciovec_t.
 static_assert(offsetof(struct iovec, iov_base) ==
-                  offsetof(cloudabi_ciovec_t, iov_base),
+                  offsetof(cloudabi_ciovec_t, buf),
               "Offset mismatch");
 static_assert(sizeof(((struct iovec *)0)->iov_base) ==
-                  sizeof(((cloudabi_ciovec_t *)0)->iov_base),
+                  sizeof(((cloudabi_ciovec_t *)0)->buf),
               "Size mismatch");
 static_assert(offsetof(struct iovec, iov_len) ==
-                  offsetof(cloudabi_ciovec_t, iov_len),
+                  offsetof(cloudabi_ciovec_t, buf_len),
               "Offset mismatch");
 static_assert(sizeof(((struct iovec *)0)->iov_len) ==
-                  sizeof(((cloudabi_ciovec_t *)0)->iov_len),
+                  sizeof(((cloudabi_ciovec_t *)0)->buf_len),
               "Size mismatch");
 static_assert(sizeof(struct iovec) == sizeof(cloudabi_ciovec_t),
               "Size mismatch");
@@ -2836,7 +2836,7 @@ static cloudabi_errno_t sock_recv(cloudabi_fd_t sock,
       .msg_name = &ss,
       .msg_namelen = sizeof(ss),
       .msg_iov = (struct iovec *)in->ri_data,
-      .msg_iovlen = in->ri_datalen,
+      .msg_iovlen = in->ri_data_len,
   };
   int nflags = 0;
   if ((in->ri_flags & CLOUDABI_MSG_PEEK) != 0)
@@ -2875,7 +2875,7 @@ static cloudabi_errno_t sock_send(cloudabi_fd_t sock,
                                   cloudabi_send_out_t *out) {
   // Convert input to msghdr.
   struct msghdr hdr = {
-      .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_datalen,
+      .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_data_len,
   };
   int nflags = 0;
   if ((in->si_flags & CLOUDABI_MSG_EOR) != 0)
@@ -3033,7 +3033,7 @@ static cloudabi_errno_t thread_create(cloudabi_threadattr_t *attr,
   // used by the emulator. The wakeup performed by thread_exit() may
   // cause another thread in the application to free the stack while
   // we're still shutting down.
-  pthread_attr_setstacksize(&nattr, attr->stack_size);
+  pthread_attr_setstacksize(&nattr, attr->stack_len);
 
   // Spawn a new thread.
   pthread_t thread;
