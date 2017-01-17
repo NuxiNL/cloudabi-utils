@@ -829,7 +829,7 @@ static cloudabi_errno_t fd_pread(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
   return 0;
 #else
   if (iovcnt == 1) {
-    ssize_t len = pread(fd_number(fo), iov->iov_base, iov->iov_len, offset);
+    ssize_t len = pread(fd_number(fo), iov->buf, iov->buf_len, offset);
     fd_object_release(fo);
     if (len < 0)
       return convert_errno(errno);
@@ -839,7 +839,7 @@ static cloudabi_errno_t fd_pread(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
     // Allocate a single buffer to fit all data.
     size_t totalsize = 0;
     for (size_t i = 0; i < iovcnt; ++i)
-      totalsize += iov[i].iov_len;
+      totalsize += iov[i].buf_len;
     char *buf = malloc(totalsize);
     if (buf == NULL) {
       fd_object_release(fo);
@@ -857,11 +857,11 @@ static cloudabi_errno_t fd_pread(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
     // Copy data back to vectors.
     size_t bufoff = 0;
     for (size_t i = 0; i < iovcnt; ++i) {
-      if (bufoff + iov[i].iov_len < len) {
-        memcpy(iov[i].iov_base, buf + bufoff, iov[i].iov_len);
-        bufoff += iov[i].iov_len;
+      if (bufoff + iov[i].buf_len < len) {
+        memcpy(iov[i].buf, buf + bufoff, iov[i].buf_len);
+        bufoff += iov[i].buf_len;
       } else {
-        memcpy(iov[i].iov_base, buf + bufoff, len - bufoff);
+        memcpy(iov[i].buf, buf + bufoff, len - bufoff);
         break;
       }
     }
@@ -890,12 +890,12 @@ static cloudabi_errno_t fd_pwrite(cloudabi_fd_t fd,
   len = pwritev(fd_number(fo), (const struct iovec *)iov, iovcnt, offset);
 #else
   if (iovcnt == 1) {
-    len = pwrite(fd_number(fo), iov->iov_base, iov->iov_len, offset);
+    len = pwrite(fd_number(fo), iov->buf, iov->buf_len, offset);
   } else {
     // Allocate a single buffer to fit all data.
     size_t totalsize = 0;
     for (size_t i = 0; i < iovcnt; ++i)
-      totalsize += iov[i].iov_len;
+      totalsize += iov[i].buf_len;
     char *buf = malloc(totalsize);
     if (buf == NULL) {
       fd_object_release(fo);
@@ -903,8 +903,8 @@ static cloudabi_errno_t fd_pwrite(cloudabi_fd_t fd,
     }
     size_t bufoff = 0;
     for (size_t i = 0; i < iovcnt; ++i) {
-      memcpy(buf + bufoff, iov[i].iov_base, iov[i].iov_len);
-      bufoff += iov[i].iov_len;
+      memcpy(buf + bufoff, iov[i].buf, iov[i].buf_len);
+      bufoff += iov[i].buf_len;
     }
 
     // Perform a single write operation.
