@@ -2233,12 +2233,6 @@ static cloudabi_errno_t mem_advise(void *addr, size_t len,
   return 0;
 }
 
-static cloudabi_errno_t mem_lock(const void *addr, size_t len) {
-  if (mlock(addr, len) < 0)
-    return convert_errno(errno);
-  return 0;
-}
-
 static bool convert_mprot(cloudabi_mflags_t in, int *out) {
   // Test for invalid bits.
   if ((in & ~(CLOUDABI_PROT_READ | CLOUDABI_PROT_WRITE | CLOUDABI_PROT_EXEC)) !=
@@ -2330,12 +2324,6 @@ static cloudabi_errno_t mem_sync(void *addr, size_t len,
     nflags |= MS_INVALIDATE;
 
   if (msync(addr, len, flags) < 0)
-    return convert_errno(errno);
-  return 0;
-}
-
-static cloudabi_errno_t mem_unlock(const void *addr, size_t len) {
-  if (munlock(addr, len) < 0)
     return convert_errno(errno);
   return 0;
 }
