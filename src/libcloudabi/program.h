@@ -26,9 +26,9 @@
 #ifndef CLOUDABI_PROGRAM_H
 #define CLOUDABI_PROGRAM_H
 
-#ifndef CLOUDABI_ARGDATA_T_DECLARED
-typedef struct cloudabi_argdata argdata_t;
-#define CLOUDABI_ARGDATA_T_DECLARED
+#ifndef argdata_t
+typedef struct argdata_t argdata_t;
+#define argdata_t argdata_t
 #endif
 
 #ifdef __cplusplus
