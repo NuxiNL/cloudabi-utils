@@ -28,12 +28,12 @@ void program_main(const argdata_t *ad) {
 
   // Serialize argument data that needs to be passed to the executable.
   size_t buflen, fdslen;
-  argdata_get_buffer_length(argv, &buflen, &fdslen);
+  argdata_serialized_length(argv, &buflen, &fdslen);
   int *fds = malloc(fdslen * sizeof(fds[0]) + buflen);
   if (fds == NULL)
     _Exit(127);
   void *buf = &fds[fdslen];
-  fdslen = argdata_get_buffer(argv, buf, fds);
+  fdslen = argdata_serialize(argv, buf, fds);
 
   // Register file descriptors.
   struct fd_table ft;
