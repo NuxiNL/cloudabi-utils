@@ -45,6 +45,7 @@
 
 #include "futex.h"
 #include "locking.h"
+#include "numeric_limits.h"
 #include "posix.h"
 #include "random.h"
 #include "refcount.h"
@@ -52,8 +53,6 @@
 #include "str.h"
 #include "tidpool.h"
 #include "tls.h"
-
-#include "../libcloudabi/numeric_limits.h"
 
 // struct iovec must have the same layout as cloudabi_iovec_t.
 static_assert(offsetof(struct iovec, iov_base) ==
