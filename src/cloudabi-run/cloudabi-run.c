@@ -729,14 +729,14 @@ int main(int argc, char *argv[]) {
   if (do_emulate) {
     // Serialize argument data that needs to be passed to the executable.
     size_t buflen, fdslen;
-    argdata_get_buffer_length(ad, &buflen, &fdslen);
+    argdata_serialized_length(ad, &buflen, &fdslen);
     int *fds = malloc(fdslen * sizeof(fds[0]) + buflen);
     if (fds == NULL) {
       perror("Cannot allocate argument data buffer");
       exit(127);
     }
     void *buf = &fds[fdslen];
-    fdslen = argdata_get_buffer(ad, buf, fds);
+    fdslen = argdata_serialize(ad, buf, fds);
 
     // Register file descriptors.
     struct fd_table ft;

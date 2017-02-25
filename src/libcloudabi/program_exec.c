@@ -24,9 +24,9 @@ int program_exec(int fd, const argdata_t *ad) {
   // Encode data. Add a trailing null byte, as execve() uses null
   // terminated strings.
   size_t datalen;
-  argdata_get_buffer_length(adseq, &datalen, NULL);
+  argdata_serialized_length(adseq, &datalen, NULL);
   char data[datalen + 1];
-  argdata_get_buffer(adseq, data, NULL);
+  argdata_serialize(adseq, data, NULL);
   data[datalen] = '\0';
   argdata_free(adfd);
   argdata_free(adseq);
