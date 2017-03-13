@@ -216,8 +216,8 @@ static bool convert_clockid(cloudabi_clockid_t in, clockid_t *out) {
   }
 }
 
-static cloudabi_errno_t clock_res_get(cloudabi_clockid_t clock_id,
-                                      cloudabi_timestamp_t *resolution) {
+static cloudabi_errno_t sys_clock_res_get(cloudabi_clockid_t clock_id,
+                                          cloudabi_timestamp_t *resolution) {
   clockid_t nclock_id;
   if (!convert_clockid(clock_id, &nclock_id))
     return CLOUDABI_EINVAL;
@@ -228,9 +228,9 @@ static cloudabi_errno_t clock_res_get(cloudabi_clockid_t clock_id,
   return 0;
 }
 
-static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
-                                       cloudabi_timestamp_t precision,
-                                       cloudabi_timestamp_t *time) {
+static cloudabi_errno_t sys_clock_time_get(cloudabi_clockid_t clock_id,
+                                           cloudabi_timestamp_t precision,
+                                           cloudabi_timestamp_t *time) {
   clockid_t nclock_id;
   if (!convert_clockid(clock_id, &nclock_id))
     return CLOUDABI_EINVAL;
@@ -241,9 +241,10 @@ static cloudabi_errno_t clock_time_get(cloudabi_clockid_t clock_id,
   return 0;
 }
 
-static cloudabi_errno_t condvar_signal(_Atomic(cloudabi_condvar_t) * condvar,
-                                       cloudabi_scope_t scope,
-                                       cloudabi_nthreads_t nwaiters) {
+static cloudabi_errno_t sys_condvar_signal(_Atomic(cloudabi_condvar_t) *
+                                               condvar,
+                                           cloudabi_scope_t scope,
+                                           cloudabi_nthreads_t nwaiters) {
   return futex_op_condvar_signal(condvar, scope, nwaiters);
 }
 
@@ -621,7 +622,7 @@ static cloudabi_errno_t fd_table_insert_fdpair(
   return 0;
 }
 
-static cloudabi_errno_t fd_close(cloudabi_fd_t fd) {
+static cloudabi_errno_t sys_fd_close(cloudabi_fd_t fd) {
   // Validate the file descriptor.
   struct fd_table *ft = curfds;
   rwlock_wrlock(&ft->lock);
@@ -649,8 +650,8 @@ static cloudabi_errno_t fd_create_socket(cloudabi_filetype_t type, int socktype,
                             RIGHTS_SOCKET_INHERITING, fd);
 }
 
-static cloudabi_errno_t fd_create1(cloudabi_filetype_t type,
-                                   cloudabi_fd_t *fd) {
+static cloudabi_errno_t sys_fd_create1(cloudabi_filetype_t type,
+                                       cloudabi_fd_t *fd) {
   switch (type) {
     case CLOUDABI_FILETYPE_POLL: {
 #if CONFIG_HAS_KQUEUE
@@ -715,8 +716,8 @@ static cloudabi_errno_t fd_create_socketpair(cloudabi_filetype_t type,
                                 fd1, fd2);
 }
 
-static cloudabi_errno_t fd_create2(cloudabi_filetype_t type, cloudabi_fd_t *fd1,
-                                   cloudabi_fd_t *fd2) {
+static cloudabi_errno_t sys_fd_create2(cloudabi_filetype_t type,
+                                       cloudabi_fd_t *fd1, cloudabi_fd_t *fd2) {
   switch (type) {
     case CLOUDABI_FILETYPE_FIFO: {
       int fds[2];
@@ -764,7 +765,7 @@ static cloudabi_errno_t fd_object_get(struct fd_object **fo, cloudabi_fd_t fd,
   return 0;
 }
 
-static cloudabi_errno_t fd_datasync(cloudabi_fd_t fd) {
+static cloudabi_errno_t sys_fd_datasync(cloudabi_fd_t fd) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, fd, CLOUDABI_RIGHT_FD_DATASYNC, 0);
@@ -782,7 +783,7 @@ static cloudabi_errno_t fd_datasync(cloudabi_fd_t fd) {
   return 0;
 }
 
-static cloudabi_errno_t fd_dup(cloudabi_fd_t from, cloudabi_fd_t *fd) {
+static cloudabi_errno_t sys_fd_dup(cloudabi_fd_t from, cloudabi_fd_t *fd) {
   struct fd_table *ft = curfds;
   rwlock_wrlock(&ft->lock);
   struct fd_entry *fe;
@@ -806,9 +807,10 @@ static cloudabi_errno_t fd_dup(cloudabi_fd_t from, cloudabi_fd_t *fd) {
   return 0;
 }
 
-static cloudabi_errno_t fd_pread(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
-                                 size_t iovcnt, cloudabi_filesize_t offset,
-                                 size_t *nread) {
+static cloudabi_errno_t sys_fd_pread(cloudabi_fd_t fd,
+                                     const cloudabi_iovec_t *iov, size_t iovcnt,
+                                     cloudabi_filesize_t offset,
+                                     size_t *nread) {
   if (iovcnt == 0)
     return CLOUDABI_EINVAL;
 
@@ -871,10 +873,10 @@ static cloudabi_errno_t fd_pread(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
 #endif
 }
 
-static cloudabi_errno_t fd_pwrite(cloudabi_fd_t fd,
-                                  const cloudabi_ciovec_t *iov, size_t iovcnt,
-                                  cloudabi_filesize_t offset,
-                                  size_t *nwritten) {
+static cloudabi_errno_t sys_fd_pwrite(cloudabi_fd_t fd,
+                                      const cloudabi_ciovec_t *iov,
+                                      size_t iovcnt, cloudabi_filesize_t offset,
+                                      size_t *nwritten) {
   if (iovcnt == 0)
     return CLOUDABI_EINVAL;
 
@@ -918,8 +920,9 @@ static cloudabi_errno_t fd_pwrite(cloudabi_fd_t fd,
   return 0;
 }
 
-static cloudabi_errno_t fd_read(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
-                                size_t iovcnt, size_t *nread) {
+static cloudabi_errno_t sys_fd_read(cloudabi_fd_t fd,
+                                    const cloudabi_iovec_t *iov, size_t iovcnt,
+                                    size_t *nread) {
   struct fd_object *fo;
   cloudabi_errno_t error = fd_object_get(&fo, fd, CLOUDABI_RIGHT_FD_READ, 0);
   if (error != 0)
@@ -933,7 +936,7 @@ static cloudabi_errno_t fd_read(cloudabi_fd_t fd, const cloudabi_iovec_t *iov,
   return 0;
 }
 
-static cloudabi_errno_t fd_replace(cloudabi_fd_t from, cloudabi_fd_t to) {
+static cloudabi_errno_t sys_fd_replace(cloudabi_fd_t from, cloudabi_fd_t to) {
   struct fd_table *ft = curfds;
   rwlock_wrlock(&ft->lock);
   struct fd_entry *fe_from;
@@ -959,9 +962,10 @@ static cloudabi_errno_t fd_replace(cloudabi_fd_t from, cloudabi_fd_t to) {
   return 0;
 }
 
-static cloudabi_errno_t fd_seek(cloudabi_fd_t fd, cloudabi_filedelta_t offset,
-                                cloudabi_whence_t whence,
-                                cloudabi_filesize_t *newoffset) {
+static cloudabi_errno_t sys_fd_seek(cloudabi_fd_t fd,
+                                    cloudabi_filedelta_t offset,
+                                    cloudabi_whence_t whence,
+                                    cloudabi_filesize_t *newoffset) {
   int nwhence;
   switch (whence) {
     case CLOUDABI_WHENCE_CUR:
@@ -978,11 +982,12 @@ static cloudabi_errno_t fd_seek(cloudabi_fd_t fd, cloudabi_filedelta_t offset,
   }
 
   struct fd_object *fo;
-  cloudabi_errno_t error = fd_object_get(
-      &fo, fd, offset == 0 && whence == CLOUDABI_WHENCE_CUR
-                   ? CLOUDABI_RIGHT_FD_TELL
-                   : CLOUDABI_RIGHT_FD_SEEK | CLOUDABI_RIGHT_FD_TELL,
-      0);
+  cloudabi_errno_t error =
+      fd_object_get(&fo, fd,
+                    offset == 0 && whence == CLOUDABI_WHENCE_CUR
+                        ? CLOUDABI_RIGHT_FD_TELL
+                        : CLOUDABI_RIGHT_FD_SEEK | CLOUDABI_RIGHT_FD_TELL,
+                    0);
   if (error != 0)
     return error;
 
@@ -994,7 +999,8 @@ static cloudabi_errno_t fd_seek(cloudabi_fd_t fd, cloudabi_filedelta_t offset,
   return 0;
 }
 
-static cloudabi_errno_t fd_stat_get(cloudabi_fd_t fd, cloudabi_fdstat_t *buf) {
+static cloudabi_errno_t sys_fd_stat_get(cloudabi_fd_t fd,
+                                        cloudabi_fdstat_t *buf) {
   struct fd_table *ft = curfds;
   rwlock_rdlock(&ft->lock);
   struct fd_entry *fe;
@@ -1050,9 +1056,9 @@ static cloudabi_errno_t fd_stat_get(cloudabi_fd_t fd, cloudabi_fdstat_t *buf) {
   return 0;
 }
 
-static cloudabi_errno_t fd_stat_put(cloudabi_fd_t fd,
-                                    const cloudabi_fdstat_t *buf,
-                                    cloudabi_fdsflags_t flags) {
+static cloudabi_errno_t sys_fd_stat_put(cloudabi_fd_t fd,
+                                        const cloudabi_fdstat_t *buf,
+                                        cloudabi_fdsflags_t flags) {
   switch (flags) {
     case CLOUDABI_FDSTAT_FLAGS: {
       int noflags = 0;
@@ -1111,7 +1117,7 @@ static cloudabi_errno_t fd_stat_put(cloudabi_fd_t fd,
   }
 }
 
-static cloudabi_errno_t fd_sync(cloudabi_fd_t fd) {
+static cloudabi_errno_t sys_fd_sync(cloudabi_fd_t fd) {
   struct fd_object *fo;
   cloudabi_errno_t error = fd_object_get(&fo, fd, CLOUDABI_RIGHT_FD_SYNC, 0);
   if (error != 0)
@@ -1124,8 +1130,9 @@ static cloudabi_errno_t fd_sync(cloudabi_fd_t fd) {
   return 0;
 }
 
-static cloudabi_errno_t fd_write(cloudabi_fd_t fd, const cloudabi_ciovec_t *iov,
-                                 size_t iovcnt, size_t *nwritten) {
+static cloudabi_errno_t sys_fd_write(cloudabi_fd_t fd,
+                                     const cloudabi_ciovec_t *iov,
+                                     size_t iovcnt, size_t *nwritten) {
   struct fd_object *fo;
   cloudabi_errno_t error = fd_object_get(&fo, fd, CLOUDABI_RIGHT_FD_WRITE, 0);
   if (error != 0)
@@ -1139,10 +1146,10 @@ static cloudabi_errno_t fd_write(cloudabi_fd_t fd, const cloudabi_ciovec_t *iov,
   return 0;
 }
 
-static cloudabi_errno_t file_advise(cloudabi_fd_t fd,
-                                    cloudabi_filesize_t offset,
-                                    cloudabi_filesize_t len,
-                                    cloudabi_advice_t advice) {
+static cloudabi_errno_t sys_file_advise(cloudabi_fd_t fd,
+                                        cloudabi_filesize_t offset,
+                                        cloudabi_filesize_t len,
+                                        cloudabi_advice_t advice) {
 #ifdef POSIX_FADV_NORMAL
   int nadvice;
   switch (advice) {
@@ -1204,9 +1211,9 @@ static cloudabi_errno_t file_advise(cloudabi_fd_t fd,
 #endif
 }
 
-static cloudabi_errno_t file_allocate(cloudabi_fd_t fd,
-                                      cloudabi_filesize_t offset,
-                                      cloudabi_filesize_t len) {
+static cloudabi_errno_t sys_file_allocate(cloudabi_fd_t fd,
+                                          cloudabi_filesize_t offset,
+                                          cloudabi_filesize_t len) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, fd, CLOUDABI_RIGHT_FILE_ALLOCATE, 0);
@@ -1541,8 +1548,9 @@ static void cwd_put(void) UNLOCKS(cwd_lock) {
 
 #endif
 
-static cloudabi_errno_t file_create(cloudabi_fd_t fd, const char *path,
-                                    size_t pathlen, cloudabi_filetype_t type) {
+static cloudabi_errno_t sys_file_create(cloudabi_fd_t fd, const char *path,
+                                        size_t pathlen,
+                                        cloudabi_filetype_t type) {
   switch (type) {
     case CLOUDABI_FILETYPE_DIRECTORY: {
       struct path_access pa;
@@ -1586,9 +1594,9 @@ static cloudabi_errno_t file_create(cloudabi_fd_t fd, const char *path,
   }
 }
 
-static cloudabi_errno_t file_link(cloudabi_lookup_t fd1, const char *path1,
-                                  size_t path1len, cloudabi_fd_t fd2,
-                                  const char *path2, size_t path2len) {
+static cloudabi_errno_t sys_file_link(cloudabi_lookup_t fd1, const char *path1,
+                                      size_t path1len, cloudabi_fd_t fd2,
+                                      const char *path2, size_t path2len) {
   struct path_access pa1;
   cloudabi_errno_t error = path_get(&pa1, fd1, path1, path1len,
                                     CLOUDABI_RIGHT_FILE_LINK_SOURCE, 0, false);
@@ -1621,10 +1629,10 @@ static cloudabi_errno_t file_link(cloudabi_lookup_t fd1, const char *path1,
   return 0;
 }
 
-static cloudabi_errno_t file_open(cloudabi_lookup_t dirfd, const char *path,
-                                  size_t pathlen, cloudabi_oflags_t oflags,
-                                  const cloudabi_fdstat_t *fds,
-                                  cloudabi_fd_t *fd) {
+static cloudabi_errno_t sys_file_open(cloudabi_lookup_t dirfd, const char *path,
+                                      size_t pathlen, cloudabi_oflags_t oflags,
+                                      const cloudabi_fdstat_t *fds,
+                                      cloudabi_fd_t *fd) {
   // Rights that should be installed on the new file descriptor.
   cloudabi_rights_t rights_base = fds->fs_rights_base;
   cloudabi_rights_t rights_inheriting = fds->fs_rights_inheriting;
@@ -1738,9 +1746,10 @@ static void file_readdir_put(void *buf, size_t bufsize, size_t *bufused,
   *bufused += elemsize;
 }
 
-static cloudabi_errno_t file_readdir(cloudabi_fd_t fd, void *buf, size_t nbyte,
-                                     cloudabi_dircookie_t cookie,
-                                     size_t *bufused) {
+static cloudabi_errno_t sys_file_readdir(cloudabi_fd_t fd, void *buf,
+                                         size_t nbyte,
+                                         cloudabi_dircookie_t cookie,
+                                         size_t *bufused) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, fd, CLOUDABI_RIGHT_FILE_READDIR, 0);
@@ -1826,9 +1835,9 @@ static cloudabi_errno_t file_readdir(cloudabi_fd_t fd, void *buf, size_t nbyte,
   return 0;
 }
 
-static cloudabi_errno_t file_readlink(cloudabi_fd_t fd, const char *path,
-                                      size_t pathlen, char *buf, size_t bufsize,
-                                      size_t *bufused) {
+static cloudabi_errno_t sys_file_readlink(cloudabi_fd_t fd, const char *path,
+                                          size_t pathlen, char *buf,
+                                          size_t bufsize, size_t *bufused) {
   struct path_access pa;
   cloudabi_errno_t error = path_get_nofollow(
       &pa, fd, path, pathlen, CLOUDABI_RIGHT_FILE_READLINK, 0, false);
@@ -1847,9 +1856,9 @@ static cloudabi_errno_t file_readlink(cloudabi_fd_t fd, const char *path,
   return 0;
 }
 
-static cloudabi_errno_t file_rename(cloudabi_fd_t oldfd, const char *old,
-                                    size_t oldlen, cloudabi_fd_t newfd,
-                                    const char *new, size_t newlen) {
+static cloudabi_errno_t sys_file_rename(cloudabi_fd_t oldfd, const char *old,
+                                        size_t oldlen, cloudabi_fd_t newfd,
+                                        const char *new, size_t newlen) {
   struct path_access pa1;
   cloudabi_errno_t error = path_get_nofollow(
       &pa1, oldfd, old, oldlen, CLOUDABI_RIGHT_FILE_RENAME_SOURCE, 0, true);
@@ -1887,8 +1896,8 @@ static void convert_stat(const struct stat *in, cloudabi_filestat_t *out) {
   };
 }
 
-static cloudabi_errno_t file_stat_fget(cloudabi_fd_t fd,
-                                       cloudabi_filestat_t *buf) {
+static cloudabi_errno_t sys_file_stat_fget(cloudabi_fd_t fd,
+                                           cloudabi_filestat_t *buf) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, fd, CLOUDABI_RIGHT_FILE_STAT_FGET, 0);
@@ -2014,9 +2023,9 @@ static void convert_utimes_stat(struct stat *sb, bool need_atim, bool need_mtim,
 
 #endif
 
-static cloudabi_errno_t file_stat_fput(cloudabi_fd_t fd,
-                                       const cloudabi_filestat_t *buf,
-                                       cloudabi_fsflags_t flags) {
+static cloudabi_errno_t sys_file_stat_fput(cloudabi_fd_t fd,
+                                           const cloudabi_filestat_t *buf,
+                                           cloudabi_fsflags_t flags) {
   if ((flags & CLOUDABI_FILESTAT_SIZE) != 0) {
     if ((flags & ~CLOUDABI_FILESTAT_SIZE) != 0)
       return CLOUDABI_EINVAL;
@@ -2074,9 +2083,9 @@ static cloudabi_errno_t file_stat_fput(cloudabi_fd_t fd,
   return CLOUDABI_EINVAL;
 }
 
-static cloudabi_errno_t file_stat_get(cloudabi_lookup_t fd, const char *path,
-                                      size_t pathlen,
-                                      cloudabi_filestat_t *buf) {
+static cloudabi_errno_t sys_file_stat_get(cloudabi_lookup_t fd,
+                                          const char *path, size_t pathlen,
+                                          cloudabi_filestat_t *buf) {
   struct path_access pa;
   cloudabi_errno_t error =
       path_get(&pa, fd, path, pathlen, CLOUDABI_RIGHT_FILE_STAT_GET, 0, false);
@@ -2109,10 +2118,10 @@ static cloudabi_errno_t file_stat_get(cloudabi_lookup_t fd, const char *path,
   return 0;
 }
 
-static cloudabi_errno_t file_stat_put(cloudabi_lookup_t fd, const char *path,
-                                      size_t pathlen,
-                                      const cloudabi_filestat_t *buf,
-                                      cloudabi_fsflags_t flags) {
+static cloudabi_errno_t sys_file_stat_put(cloudabi_lookup_t fd,
+                                          const char *path, size_t pathlen,
+                                          const cloudabi_filestat_t *buf,
+                                          cloudabi_fsflags_t flags) {
   if ((flags &
        ~(CLOUDABI_FILESTAT_ATIM | CLOUDABI_FILESTAT_ATIM_NOW |
          CLOUDABI_FILESTAT_MTIM | CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
@@ -2156,9 +2165,9 @@ static cloudabi_errno_t file_stat_put(cloudabi_lookup_t fd, const char *path,
   return 0;
 }
 
-static cloudabi_errno_t file_symlink(const char *path1, size_t path1len,
-                                     cloudabi_fd_t fd, const char *path2,
-                                     size_t path2len) {
+static cloudabi_errno_t sys_file_symlink(const char *path1, size_t path1len,
+                                         cloudabi_fd_t fd, const char *path2,
+                                         size_t path2len) {
   char *target = str_nullterminate(path1, path1len);
   if (target == NULL)
     return convert_errno(errno);
@@ -2179,8 +2188,9 @@ static cloudabi_errno_t file_symlink(const char *path1, size_t path1len,
   return 0;
 }
 
-static cloudabi_errno_t file_unlink(cloudabi_fd_t fd, const char *path,
-                                    size_t pathlen, cloudabi_ulflags_t flags) {
+static cloudabi_errno_t sys_file_unlink(cloudabi_fd_t fd, const char *path,
+                                        size_t pathlen,
+                                        cloudabi_ulflags_t flags) {
   struct path_access pa;
   cloudabi_errno_t error = path_get_nofollow(
       &pa, fd, path, pathlen, CLOUDABI_RIGHT_FILE_UNLINK, 0, true);
@@ -2198,13 +2208,13 @@ static cloudabi_errno_t file_unlink(cloudabi_fd_t fd, const char *path,
   return 0;
 }
 
-static cloudabi_errno_t lock_unlock(_Atomic(cloudabi_lock_t) * lock,
-                                    cloudabi_scope_t scope) {
+static cloudabi_errno_t sys_lock_unlock(_Atomic(cloudabi_lock_t) * lock,
+                                        cloudabi_scope_t scope) {
   return futex_op_lock_unlock(curtid, lock, scope);
 }
 
-static cloudabi_errno_t mem_advise(void *addr, size_t len,
-                                   cloudabi_advice_t advice) {
+static cloudabi_errno_t sys_mem_advise(void *addr, size_t len,
+                                       cloudabi_advice_t advice) {
   int nadvice;
   switch (advice) {
     case CLOUDABI_ADVICE_DONTNEED:
@@ -2252,9 +2262,10 @@ static bool convert_mprot(cloudabi_mflags_t in, int *out) {
   return true;
 }
 
-static cloudabi_errno_t mem_map(void *addr, size_t len, cloudabi_mprot_t prot,
-                                cloudabi_mflags_t flags, cloudabi_fd_t fd,
-                                cloudabi_filesize_t off, void **mem) {
+static cloudabi_errno_t sys_mem_map(void *addr, size_t len,
+                                    cloudabi_mprot_t prot,
+                                    cloudabi_mflags_t flags, cloudabi_fd_t fd,
+                                    cloudabi_filesize_t off, void **mem) {
   int nprot;
   if (!convert_mprot(prot, &nprot))
     return CLOUDABI_ENOTSUP;
@@ -2296,8 +2307,8 @@ static cloudabi_errno_t mem_map(void *addr, size_t len, cloudabi_mprot_t prot,
   return 0;
 }
 
-static cloudabi_errno_t mem_protect(void *addr, size_t len,
-                                    cloudabi_mprot_t prot) {
+static cloudabi_errno_t sys_mem_protect(void *addr, size_t len,
+                                        cloudabi_mprot_t prot) {
   int nprot;
   if (!convert_mprot(prot, &nprot))
     return CLOUDABI_ENOTSUP;
@@ -2306,8 +2317,8 @@ static cloudabi_errno_t mem_protect(void *addr, size_t len,
   return 0;
 }
 
-static cloudabi_errno_t mem_sync(void *addr, size_t len,
-                                 cloudabi_msflags_t flags) {
+static cloudabi_errno_t sys_mem_sync(void *addr, size_t len,
+                                     cloudabi_msflags_t flags) {
   int nflags = 0;
   switch (flags & (CLOUDABI_MS_ASYNC | CLOUDABI_MS_SYNC)) {
     case CLOUDABI_MS_ASYNC:
@@ -2327,7 +2338,7 @@ static cloudabi_errno_t mem_sync(void *addr, size_t len,
   return 0;
 }
 
-static cloudabi_errno_t mem_unmap(void *addr, size_t len) {
+static cloudabi_errno_t sys_mem_unmap(void *addr, size_t len) {
   if (munmap(addr, len) < 0)
     return convert_errno(errno);
   return 0;
@@ -2408,9 +2419,9 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
   return 0;
 }
 
-static cloudabi_errno_t poll(const cloudabi_subscription_t *in,
-                             cloudabi_event_t *out, size_t nsubscriptions,
-                             size_t *nevents) {
+static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
+                                 cloudabi_event_t *out, size_t nsubscriptions,
+                                 size_t *nevents) {
   // Capture poll() calls that deal with futexes.
   if (futex_op_poll(curtid, in, out, nsubscriptions, nevents))
     return 0;
@@ -2512,27 +2523,28 @@ static cloudabi_errno_t poll(const cloudabi_subscription_t *in,
   return CLOUDABI_ENOSYS;
 }
 
-static cloudabi_errno_t poll_fd(cloudabi_fd_t fd,
-                                const cloudabi_subscription_t *in, size_t nin,
-                                cloudabi_event_t *out, size_t nout,
-                                const cloudabi_subscription_t *timeout,
-                                size_t *nevents) {
+static cloudabi_errno_t sys_poll_fd(cloudabi_fd_t fd,
+                                    const cloudabi_subscription_t *in,
+                                    size_t nin, cloudabi_event_t *out,
+                                    size_t nout,
+                                    const cloudabi_subscription_t *timeout,
+                                    size_t *nevents) {
   fputs("Unimplemented poll_fd()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
-static cloudabi_errno_t proc_exec(cloudabi_fd_t fd, const void *data,
-                                  size_t datalen, const cloudabi_fd_t *fds,
-                                  size_t fdslen) {
+static cloudabi_errno_t sys_proc_exec(cloudabi_fd_t fd, const void *data,
+                                      size_t datalen, const cloudabi_fd_t *fds,
+                                      size_t fdslen) {
   fputs("Unimplemented proc_exec()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
-static void proc_exit(cloudabi_exitcode_t rval) {
+static void sys_proc_exit(cloudabi_exitcode_t rval) {
   _Exit(rval);
 }
 
-static cloudabi_errno_t proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
+static cloudabi_errno_t sys_proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
   // Lock down the file descriptor table while forking, to ensure it's
   // consistent after forking.
   struct fd_table *ft = curfds;
@@ -2580,7 +2592,7 @@ static cloudabi_errno_t proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
   }
 }
 
-static cloudabi_errno_t proc_raise(cloudabi_signal_t sig) {
+static cloudabi_errno_t sys_proc_raise(cloudabi_signal_t sig) {
   static const int signals[] = {
 #define X(v) [CLOUDABI_##v] = v
       X(SIGABRT), X(SIGALRM), X(SIGBUS), X(SIGCHLD), X(SIGCONT), X(SIGFPE),
@@ -2610,7 +2622,7 @@ static cloudabi_errno_t proc_raise(cloudabi_signal_t sig) {
   return 0;
 }
 
-static cloudabi_errno_t random_get(void *buf, size_t nbyte) {
+static cloudabi_errno_t sys_random_get(void *buf, size_t nbyte) {
   random_buf(buf, nbyte);
   return 0;
 }
@@ -2647,9 +2659,9 @@ static void convert_sockaddr(const struct sockaddr_storage *sa, socklen_t sal,
   }
 }
 
-static cloudabi_errno_t sock_accept(cloudabi_fd_t sock,
-                                    cloudabi_sockstat_t *buf,
-                                    cloudabi_fd_t *conn) {
+static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock,
+                                        cloudabi_sockstat_t *buf,
+                                        cloudabi_fd_t *conn) {
   // Fetch socket file descriptor and rights.
   struct fd_table *ft = curfds;
   rwlock_wrlock(&ft->lock);
@@ -2688,8 +2700,8 @@ static cloudabi_errno_t sock_accept(cloudabi_fd_t sock,
                             RIGHTS_SOCKET_INHERITING & rights, conn);
 }
 
-static cloudabi_errno_t sock_bind(cloudabi_fd_t sock, cloudabi_fd_t fd,
-                                  const char *path, size_t pathlen) {
+static cloudabi_errno_t sys_sock_bind(cloudabi_fd_t sock, cloudabi_fd_t fd,
+                                      const char *path, size_t pathlen) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_BIND_SOCKET, 0);
@@ -2735,8 +2747,8 @@ static cloudabi_errno_t sock_bind(cloudabi_fd_t sock, cloudabi_fd_t fd,
   return 0;
 }
 
-static cloudabi_errno_t sock_connect(cloudabi_fd_t sock, cloudabi_fd_t fd,
-                                     const char *path, size_t pathlen) {
+static cloudabi_errno_t sys_sock_connect(cloudabi_fd_t sock, cloudabi_fd_t fd,
+                                         const char *path, size_t pathlen) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_CONNECT_SOCKET, 0);
@@ -2783,8 +2795,8 @@ static cloudabi_errno_t sock_connect(cloudabi_fd_t sock, cloudabi_fd_t fd,
   return 0;
 }
 
-static cloudabi_errno_t sock_listen(cloudabi_fd_t sock,
-                                    cloudabi_backlog_t backlog) {
+static cloudabi_errno_t sys_sock_listen(cloudabi_fd_t sock,
+                                        cloudabi_backlog_t backlog) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_LISTEN, 0);
@@ -2814,9 +2826,9 @@ static cloudabi_errno_t sock_listen(cloudabi_fd_t sock,
   }
 }
 
-static cloudabi_errno_t sock_recv(cloudabi_fd_t sock,
-                                  const cloudabi_recv_in_t *in,
-                                  cloudabi_recv_out_t *out) {
+static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
+                                      const cloudabi_recv_in_t *in,
+                                      cloudabi_recv_out_t *out) {
   // Convert input to msghdr.
   struct sockaddr_storage ss;
   struct msghdr hdr = {
@@ -2857,9 +2869,9 @@ static cloudabi_errno_t sock_recv(cloudabi_fd_t sock,
   return 0;
 }
 
-static cloudabi_errno_t sock_send(cloudabi_fd_t sock,
-                                  const cloudabi_send_in_t *in,
-                                  cloudabi_send_out_t *out) {
+static cloudabi_errno_t sys_sock_send(cloudabi_fd_t sock,
+                                      const cloudabi_send_in_t *in,
+                                      cloudabi_send_out_t *out) {
   // Convert input to msghdr.
   struct msghdr hdr = {
       .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_data_len,
@@ -2887,8 +2899,8 @@ static cloudabi_errno_t sock_send(cloudabi_fd_t sock,
   return 0;
 }
 
-static cloudabi_errno_t sock_shutdown(cloudabi_fd_t sock,
-                                      cloudabi_sdflags_t how) {
+static cloudabi_errno_t sys_sock_shutdown(cloudabi_fd_t sock,
+                                          cloudabi_sdflags_t how) {
   int nhow;
   switch (how) {
     case CLOUDABI_SHUT_RD:
@@ -2917,9 +2929,9 @@ static cloudabi_errno_t sock_shutdown(cloudabi_fd_t sock,
   return 0;
 }
 
-static cloudabi_errno_t sock_stat_get(cloudabi_fd_t sock,
-                                      cloudabi_sockstat_t *buf,
-                                      cloudabi_ssflags_t flags) {
+static cloudabi_errno_t sys_sock_stat_get(cloudabi_fd_t sock,
+                                          cloudabi_sockstat_t *buf,
+                                          cloudabi_ssflags_t flags) {
   struct fd_object *fo;
   cloudabi_errno_t error =
       fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_STAT_GET, 0);
@@ -2988,8 +3000,8 @@ static void *thread_entry(void *thunk) {
   abort();
 }
 
-static cloudabi_errno_t thread_create(cloudabi_threadattr_t *attr,
-                                      cloudabi_tid_t *tid) {
+static cloudabi_errno_t sys_thread_create(cloudabi_threadattr_t *attr,
+                                          cloudabi_tid_t *tid) {
   // Create parameters that need to be passed on to the thread.
   // thread_entry() is responsible for freeing it again.
   struct thread_params *params = malloc(sizeof(*params));
@@ -3033,8 +3045,8 @@ static cloudabi_errno_t thread_create(cloudabi_threadattr_t *attr,
   return 0;
 }
 
-static void thread_exit(_Atomic(cloudabi_lock_t) * lock,
-                        cloudabi_scope_t scope) {
+static void sys_thread_exit(_Atomic(cloudabi_lock_t) * lock,
+                            cloudabi_scope_t scope) {
   // Drop the lock, so threads waiting to join this thread get woken up.
   futex_op_lock_unlock(curtid, lock, scope);
 
@@ -3042,14 +3054,14 @@ static void thread_exit(_Atomic(cloudabi_lock_t) * lock,
   pthread_exit(NULL);
 }
 
-static cloudabi_errno_t thread_yield(void) {
+static cloudabi_errno_t sys_thread_yield(void) {
   if (sched_yield() < 0)
     return convert_errno(errno);
   return 0;
 }
 
 cloudabi_syscalls_t posix_syscalls = {
-#define entry(name) .name = name,
+#define entry(name) .name = sys_##name,
     CLOUDABI_SYSCALL_NAMES(entry)
 #undef entry
 };
