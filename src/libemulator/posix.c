@@ -2122,9 +2122,8 @@ static cloudabi_errno_t sys_file_stat_put(cloudabi_lookup_t fd,
                                           const char *path, size_t pathlen,
                                           const cloudabi_filestat_t *buf,
                                           cloudabi_fsflags_t flags) {
-  if ((flags &
-       ~(CLOUDABI_FILESTAT_ATIM | CLOUDABI_FILESTAT_ATIM_NOW |
-         CLOUDABI_FILESTAT_MTIM | CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
+  if ((flags & ~(CLOUDABI_FILESTAT_ATIM | CLOUDABI_FILESTAT_ATIM_NOW |
+                 CLOUDABI_FILESTAT_MTIM | CLOUDABI_FILESTAT_MTIM_NOW)) != 0)
     return CLOUDABI_EINVAL;
 
   struct path_access pa;
