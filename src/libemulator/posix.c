@@ -181,7 +181,7 @@ static cloudabi_errno_t convert_errno(int error) {
     [EWOULDBLOCK] = CLOUDABI_EAGAIN,
 #endif
   };
-  if (error < 0 || error >= sizeof(errors) / sizeof(errors[0]) ||
+  if (error < 0 || (size_t)error >= sizeof(errors) / sizeof(errors[0]) ||
       errors[error] == 0)
     return CLOUDABI_ENOSYS;
   return errors[error];
@@ -191,7 +191,7 @@ static cloudabi_errno_t convert_errno(int error) {
 static cloudabi_timestamp_t convert_timespec(const struct timespec *ts) {
   if (ts->tv_sec < 0)
     return 0;
-  if (ts->tv_sec >= UINT64_MAX / 1000000000)
+  if ((cloudabi_timestamp_t)ts->tv_sec >= UINT64_MAX / 1000000000)
     return UINT64_MAX;
   return (cloudabi_timestamp_t)ts->tv_sec * 1000000000 + ts->tv_nsec;
 }
@@ -1257,7 +1257,7 @@ static char *readlinkat_dup(int fd, const char *path) {
       free(buf);
       return NULL;
     }
-    if (ret + 1 < len) {
+    if ((size_t)ret + 1 < len) {
       buf[ret] = '\0';
       return buf;
     }
@@ -1852,7 +1852,7 @@ static cloudabi_errno_t sys_file_readlink(cloudabi_fd_t fd, const char *path,
   path_put(&pa);
   if (len < 0)
     return convert_errno(errno);
-  *bufused = len < bufsize ? len : bufsize;
+  *bufused = (size_t)len < bufsize ? len : bufsize;
   return 0;
 }
 
@@ -2354,7 +2354,7 @@ static cloudabi_signal_t convert_signal(int sig) {
       X(SIGXCPU), X(SIGXFSZ),
 #undef X
   };
-  if (sig < 0 || sig >= sizeof(signals) / sizeof(signals[0]) ||
+  if (sig < 0 || (size_t)sig >= sizeof(signals) / sizeof(signals[0]) ||
       signals[sig] == 0)
     return CLOUDABI_SIGABRT;
   return signals[sig];
@@ -2949,15 +2949,14 @@ static cloudabi_errno_t sys_sock_stat_get(cloudabi_fd_t sock,
 
   // Fill ss_error.
   if ((flags & CLOUDABI_SOCKSTAT_CLEAR_ERROR) != 0) {
-    int error;
-    socklen_t errorlen = sizeof(error);
-    if (getsockopt(fd_number(fo), SOL_SOCKET, SO_ERROR, &error, &errorlen) ==
-        -1) {
+    int err;
+    socklen_t errlen = sizeof(err);
+    if (getsockopt(fd_number(fo), SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
       fd_object_release(fo);
       return convert_errno(errno);
     }
-    if (error != 0)
-      buf->ss_error = convert_errno(error);
+    if (err != 0)
+      buf->ss_error = convert_errno(err);
   }
 
   // Fill ss_state.
