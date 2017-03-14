@@ -9,6 +9,7 @@
 #if CONFIG_HAS_KQUEUE
 #include <sys/event.h>
 #endif
+#include <sys/ioctl.h>
 #include <sys/mman.h>
 #if CONFIG_HAS_PDFORK
 #include <sys/procdesc.h>
@@ -29,6 +30,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
@@ -739,30 +741,39 @@ static cloudabi_errno_t sys_fd_create2(cloudabi_filetype_t type,
   }
 }
 
-// Temporarily locks the file descriptor table to look up a file
-// descriptor object, increases its reference count and drops the lock.
-static cloudabi_errno_t fd_object_get(struct fd_object **fo, cloudabi_fd_t fd,
-                                      cloudabi_rights_t rights_base,
-                                      cloudabi_rights_t rights_inheriting)
-    TRYLOCKS_EXCLUSIVE(0, (*fo)->refcount) {
+// Look up a file descriptor object in a locked file descriptor table
+// and increases its reference count.
+static cloudabi_errno_t fd_object_get_locked(
+    struct fd_object **fo, struct fd_table *ft, cloudabi_fd_t fd,
+    cloudabi_rights_t rights_base, cloudabi_rights_t rights_inheriting)
+    TRYLOCKS_EXCLUSIVE(0, (*fo)->refcount) REQUIRES_EXCLUSIVE(ft->lock) {
   // Test whether the file descriptor number is valid.
-  struct fd_table *ft = curfds;
-  rwlock_rdlock(&ft->lock);
   struct fd_entry *fe;
   cloudabi_errno_t error =
       fd_table_get_entry(ft, fd, rights_base, rights_inheriting, &fe);
-  if (error != 0) {
-    rwlock_unlock(&ft->lock);
+  if (error != 0)
     return error;
-  }
 
   // Increase the reference count on the file descriptor object. A copy
   // of the rights are also stored, so callers can still access those if
   // needed.
   *fo = fe->object;
   refcount_acquire(&(*fo)->refcount);
-  rwlock_unlock(&ft->lock);
   return 0;
+}
+
+// Temporarily locks the file descriptor table to look up a file
+// descriptor object, increases its reference count and drops the lock.
+static cloudabi_errno_t fd_object_get(struct fd_object **fo, cloudabi_fd_t fd,
+                                      cloudabi_rights_t rights_base,
+                                      cloudabi_rights_t rights_inheriting)
+    TRYLOCKS_EXCLUSIVE(0, (*fo)->refcount) {
+  struct fd_table *ft = curfds;
+  rwlock_rdlock(&ft->lock);
+  cloudabi_errno_t error =
+      fd_object_get_locked(fo, ft, fd, rights_base, rights_inheriting);
+  rwlock_unlock(&ft->lock);
+  return error;
 }
 
 static cloudabi_errno_t sys_fd_datasync(cloudabi_fd_t fd) {
@@ -2420,7 +2431,7 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
 
 static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
                                  cloudabi_event_t *out, size_t nsubscriptions,
-                                 size_t *nevents) {
+                                 size_t *nevents) NO_LOCK_ANALYSIS {
   // Capture poll() calls that deal with futexes.
   if (futex_op_poll(curtid, in, out, nsubscriptions, nevents))
     return 0;
@@ -2518,8 +2529,160 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     return 0;
   }
 
-  fputs("Unimplemented poll()\n", stderr);
-  return CLOUDABI_ENOSYS;
+  // Last option: call into poll(). This can only be done in case all
+  // subscriptions consist of CLOUDABI_EVENTTYPE_FD_READ and
+  // CLOUDABI_EVENTTYPE_FD_WRITE entries. There may be up to one
+  // CLOUDABI_EVENTTYPE_CLOCK entry to act as a timeout. These are also
+  // the subscriptions generate by cloudlibc's poll() and select().
+  struct fd_object **fos = malloc(nsubscriptions * sizeof(*fos));
+  if (fos == NULL)
+    return CLOUDABI_ENOMEM;
+  struct pollfd *pfds = malloc(nsubscriptions * sizeof(*pfds));
+  if (pfds == NULL) {
+    free(fos);
+    return CLOUDABI_ENOMEM;
+  }
+
+  // Convert subscriptions to pollfd entries. Increase the reference
+  // count on the file descriptors to ensure they remain valid across
+  // the call to poll().
+  struct fd_table *ft = curfds;
+  rwlock_wrlock(&ft->lock);
+  *nevents = 0;
+  const cloudabi_subscription_t *clock_subscription = NULL;
+  for (size_t i = 0; i < nsubscriptions; ++i) {
+    const cloudabi_subscription_t *s = &in[i];
+    switch (s->type) {
+      case CLOUDABI_EVENTTYPE_FD_READ:
+      case CLOUDABI_EVENTTYPE_FD_WRITE: {
+        cloudabi_errno_t error =
+            fd_object_get_locked(&fos[i], ft, s->fd_readwrite.fd,
+                                 CLOUDABI_RIGHT_POLL_FD_READWRITE, 0);
+        if (error == 0) {
+          // Proper file descriptor on which we can poll().
+          pfds[i] = (struct pollfd){
+              .fd = fd_number(fos[i]),
+              .events = s->type == CLOUDABI_EVENTTYPE_FD_READ ? POLLRDNORM
+                                                              : POLLWRNORM,
+          };
+        } else {
+          // Invalid file descriptor or rights missing.
+          fos[i] = NULL;
+          pfds[i] = (struct pollfd){.fd = -1};
+          out[(*nevents)++] = (cloudabi_event_t){
+              .userdata = s->userdata,
+              .error = error,
+              .type = s->type,
+              .fd_readwrite.fd = s->fd_readwrite.fd,
+          };
+        }
+        break;
+      }
+      case CLOUDABI_EVENTTYPE_CLOCK:
+        if (clock_subscription == NULL &&
+            (s->clock.flags & CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) == 0) {
+          // Relative timeout.
+          fos[i] = NULL;
+          pfds[i] = (struct pollfd){.fd = -1};
+          clock_subscription = s;
+          break;
+        }
+      // Fallthrough.
+      default:
+        // Unsupported event.
+        fos[i] = NULL;
+        pfds[i] = (struct pollfd){.fd = -1};
+        out[(*nevents)++] = (cloudabi_event_t){
+            .userdata = s->userdata, .error = CLOUDABI_ENOSYS, .type = s->type,
+        };
+        break;
+    }
+  }
+  rwlock_unlock(&ft->lock);
+
+  // Use a zero-second timeout in case we've already generated events in
+  // the loop above.
+  int timeout;
+  if (*nevents != 0) {
+    timeout = 0;
+  } else if (clock_subscription != NULL) {
+    cloudabi_timestamp_t ts = clock_subscription->clock.timeout / 1000000;
+    timeout = ts > INT_MAX ? -1 : ts;
+  } else {
+    timeout = -1;
+  }
+  int ret = poll(pfds, nsubscriptions, timeout);
+
+  cloudabi_errno_t error = 0;
+  if (ret == -1) {
+    error = convert_errno(errno);
+  } else if (ret == 0 && *nevents == 0 && clock_subscription != NULL) {
+    // No events triggered. Trigger the clock event.
+    out[(*nevents)++] = (cloudabi_event_t){
+        .userdata = clock_subscription->userdata,
+        .type = CLOUDABI_EVENTTYPE_CLOCK,
+        .clock.identifier = clock_subscription->clock.identifier,
+    };
+  } else {
+    // Events got triggered. Don't trigger the clock event.
+    for (size_t i = 0; i < nsubscriptions; ++i) {
+      if (pfds[i].fd >= 0) {
+        if ((pfds[i].revents & POLLNVAL) != 0) {
+          // Bad file descriptor. This normally cannot occur, as
+          // referencing the file descriptor object will always ensure
+          // the descriptor is valid. Still, macOS may sometimes return
+          // this on FIFOs when reaching end-of-file.
+          out[(*nevents)++] = (cloudabi_event_t){
+              .userdata = in[i].userdata,
+#ifdef __APPLE__
+              .fd_readwrite.flags = CLOUDABI_EVENT_FD_READWRITE_HANGUP,
+#else
+              .error = CLOUDABI_EBADF,
+#endif
+              .type = in[i].type,
+              .fd_readwrite.fd = in[i].fd_readwrite.fd,
+          };
+        } else if ((pfds[i].revents & POLLERR) != 0) {
+          // File descriptor is in an error state.
+          out[(*nevents)++] = (cloudabi_event_t){
+              .userdata = in[i].userdata,
+              .error = CLOUDABI_EIO,
+              .type = in[i].type,
+              .fd_readwrite.fd = in[i].fd_readwrite.fd,
+          };
+        } else if ((pfds[i].revents & POLLHUP) != 0) {
+          // End-of-file.
+          out[(*nevents)++] = (cloudabi_event_t){
+              .userdata = in[i].userdata,
+              .type = in[i].type,
+              .fd_readwrite.fd = in[i].fd_readwrite.fd,
+              .fd_readwrite.flags = CLOUDABI_EVENT_FD_READWRITE_HANGUP,
+          };
+        } else if ((pfds[i].revents & (POLLRDNORM | POLLWRNORM)) != 0) {
+          // Read or write possible.
+          cloudabi_filesize_t nbytes = 0;
+          if (in[i].type == CLOUDABI_EVENTTYPE_FD_READ) {
+            int l;
+            if (ioctl(fd_number(fos[i]), FIONREAD, &l) == 0)
+              nbytes = l;
+          }
+          out[(*nevents)++] = (cloudabi_event_t){
+              .userdata = in[i].userdata,
+              .type = in[i].type,
+              .fd_readwrite.nbytes = nbytes,
+              .fd_readwrite.fd = in[i].fd_readwrite.fd,
+          };
+        }
+      }
+    }
+  }
+
+  for (size_t i = 0; i < nsubscriptions; ++i)
+    if (fos[i] != NULL)
+      fd_object_release(fos[i]);
+  free(fos);
+  free(pfds);
+  return error;
 }
 
 static cloudabi_errno_t sys_poll_fd(cloudabi_fd_t fd,
