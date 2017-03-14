@@ -2627,6 +2627,12 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     // Events got triggered. Don't trigger the clock event.
     for (size_t i = 0; i < nsubscriptions; ++i) {
       if (pfds[i].fd >= 0) {
+        cloudabi_filesize_t nbytes = 0;
+        if (in[i].type == CLOUDABI_EVENTTYPE_FD_READ) {
+          int l;
+          if (ioctl(fd_number(fos[i]), FIONREAD, &l) == 0)
+            nbytes = l;
+        }
         if ((pfds[i].revents & POLLNVAL) != 0) {
           // Bad file descriptor. This normally cannot occur, as
           // referencing the file descriptor object will always ensure
@@ -2635,6 +2641,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
           out[(*nevents)++] = (cloudabi_event_t){
               .userdata = in[i].userdata,
 #ifdef __APPLE__
+              .fd_readwrite.nbytes = nbytes,
               .fd_readwrite.flags = CLOUDABI_EVENT_FD_READWRITE_HANGUP,
 #else
               .error = CLOUDABI_EBADF,
@@ -2655,17 +2662,12 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
           out[(*nevents)++] = (cloudabi_event_t){
               .userdata = in[i].userdata,
               .type = in[i].type,
+              .fd_readwrite.nbytes = nbytes,
               .fd_readwrite.fd = in[i].fd_readwrite.fd,
               .fd_readwrite.flags = CLOUDABI_EVENT_FD_READWRITE_HANGUP,
           };
         } else if ((pfds[i].revents & (POLLRDNORM | POLLWRNORM)) != 0) {
           // Read or write possible.
-          cloudabi_filesize_t nbytes = 0;
-          if (in[i].type == CLOUDABI_EVENTTYPE_FD_READ) {
-            int l;
-            if (ioctl(fd_number(fos[i]), FIONREAD, &l) == 0)
-              nbytes = l;
-          }
           out[(*nevents)++] = (cloudabi_event_t){
               .userdata = in[i].userdata,
               .type = in[i].type,
