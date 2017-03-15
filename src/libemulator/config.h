@@ -24,7 +24,7 @@
 #define CONFIG_HAS_BINDAT_STRING 0
 #endif
 
-#if defined(__CloudABI__) || defined(__FreeBSD__)
+#if defined(__CloudABI__)
 #define CONFIG_HAS_CAP_ENTER 1
 #else
 #define CONFIG_HAS_CAP_ENTER 0
