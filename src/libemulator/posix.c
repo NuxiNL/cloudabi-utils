@@ -451,13 +451,10 @@ static cloudabi_errno_t fd_determine_type_rights(
   // Strip off read/write bits based on the access mode.
   switch (fcntl(fd, F_GETFL) & O_ACCMODE) {
     case O_RDONLY:
-      *rights_base = RIGHTS_FIFO_BASE & ~CLOUDABI_RIGHT_FD_WRITE;
+      *rights_base &= ~CLOUDABI_RIGHT_FD_WRITE;
       break;
     case O_WRONLY:
-      *rights_base = RIGHTS_FIFO_BASE & ~CLOUDABI_RIGHT_FD_READ;
-      break;
-    default:
-      *rights_base = RIGHTS_FIFO_BASE;
+      *rights_base &= ~CLOUDABI_RIGHT_FD_READ;
       break;
   }
   return 0;
