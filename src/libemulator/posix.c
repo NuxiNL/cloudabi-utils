@@ -2547,7 +2547,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
   // count on the file descriptors to ensure they remain valid across
   // the call to poll().
   struct fd_table *ft = curfds;
-  rwlock_wrlock(&ft->lock);
+  rwlock_rdlock(&ft->lock);
   *nevents = 0;
   const cloudabi_subscription_t *clock_subscription = NULL;
   for (size_t i = 0; i < nsubscriptions; ++i) {
