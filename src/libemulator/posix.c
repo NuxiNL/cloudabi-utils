@@ -3007,21 +3007,64 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
   if ((in->ri_flags & CLOUDABI_MSG_WAITALL) != 0)
     nflags |= MSG_WAITALL;
 
-  // TODO(ed): Support receiving file descriptors!
+  // Provide space for a control message header if we should receive
+  // file descriptors.
+  if (in->ri_fds_len > 0) {
+    hdr.msg_controllen = CMSG_SPACE(in->ri_fds_len * sizeof(int));
+    hdr.msg_control = calloc(hdr.msg_controllen, 1);
+    if (hdr.msg_control == NULL)
+      return CLOUDABI_ENOMEM;
+
+    // Initialize SCM_RIGHTS control message header.
+    struct cmsghdr *chdr = CMSG_FIRSTHDR(&hdr);
+    chdr->cmsg_len = CMSG_LEN(in->ri_fds_len * sizeof(int));
+    chdr->cmsg_level = SOL_SOCKET;
+    chdr->cmsg_type = SCM_RIGHTS;
+  }
 
   struct fd_object *fo;
   cloudabi_errno_t error = fd_object_get(&fo, sock, CLOUDABI_RIGHT_FD_READ, 0);
-  if (error != 0)
+  if (error != 0) {
+    free(hdr.msg_control);
     return error;
+  }
 
-  ssize_t len = recvmsg(fd_number(fo), &hdr, nflags);
+  ssize_t datalen = recvmsg(fd_number(fo), &hdr, nflags);
   fd_object_release(fo);
-  if (len < 0)
+  if (datalen < 0) {
+    free(hdr.msg_control);
     return convert_errno(errno);
+  }
+
+  // Extract file descriptors from control message headers.
+  size_t fdslen;
+  for (struct cmsghdr *chdr = CMSG_FIRSTHDR(&hdr); chdr != NULL;
+       chdr = CMSG_NXTHDR(&hdr, chdr)) {
+    if (chdr->cmsg_level == SOL_SOCKET && chdr->cmsg_type == SCM_RIGHTS) {
+      for (size_t i = 0; i < (chdr->cmsg_len - CMSG_LEN(0)) / sizeof(int);
+           ++i) {
+        int nfd;
+        memcpy(&nfd, CMSG_DATA(chdr) + i * sizeof(nfd), sizeof(nfd));
+        cloudabi_filetype_t type;
+        cloudabi_rights_t max_base, max_inheriting;
+        if (fd_determine_type_rights(nfd, &type, &max_base, &max_inheriting) !=
+                0 ||
+            fd_table_insert_fd(curfds, nfd, type, max_base, max_inheriting,
+                               &in->ri_fds[fdslen]) != 0) {
+          // Corner case: received file descriptor cannot be installed.
+          // For now, close the original file descriptor and replace it
+          // by -1 in the emulated process.
+          close(nfd);
+          in->ri_fds[fdslen] = -1;
+        }
+        ++fdslen;
+      }
+    }
+  }
 
   // Convert msghdr to output.
   *out = (cloudabi_recv_out_t){
-      .ro_datalen = len,
+      .ro_datalen = datalen, .ro_fdslen = fdslen,
   };
   convert_sockaddr(&ss, hdr.msg_namelen, &out->ro_peername);
   if ((hdr.msg_flags & MSG_CTRUNC) != 0)
@@ -3030,6 +3073,7 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
     out->ro_flags |= CLOUDABI_MSG_EOR;
   if ((hdr.msg_flags & MSG_TRUNC) != 0)
     out->ro_flags |= CLOUDABI_MSG_TRUNC;
+  free(hdr.msg_control);
   return 0;
 }
 
