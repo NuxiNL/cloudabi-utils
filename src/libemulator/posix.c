@@ -3050,7 +3050,7 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
   }
 
   // Extract file descriptors from control message headers.
-  size_t fdslen;
+  size_t fdslen = 0;
   for (struct cmsghdr *chdr = CMSG_FIRSTHDR(&hdr); chdr != NULL;
        chdr = CMSG_NXTHDR(&hdr, chdr)) {
     if (chdr->cmsg_level == SOL_SOCKET && chdr->cmsg_type == SCM_RIGHTS) {
