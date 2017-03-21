@@ -3033,9 +3033,9 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
   return 0;
 }
 
-static cloudabi_errno_t sys_sock_send(cloudabi_fd_t sock,
-                                      const cloudabi_send_in_t *in,
-                                      cloudabi_send_out_t *out) {
+static cloudabi_errno_t sys_sock_send(
+    cloudabi_fd_t sock, const cloudabi_send_in_t *in,
+    cloudabi_send_out_t *out) NO_LOCK_ANALYSIS {
   // Convert input to msghdr.
   struct msghdr hdr = {
       .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_data_len,
@@ -3044,23 +3044,73 @@ static cloudabi_errno_t sys_sock_send(cloudabi_fd_t sock,
   if ((in->si_flags & CLOUDABI_MSG_EOR) != 0)
     nflags |= MSG_EOR;
 
-  // TODO(ed): Support sending file descriptors!
+  // Attach file descriptors if present.
+  cloudabi_errno_t error;
+  struct fd_object **fos = NULL;
+  size_t nfos = 0;
+  if (in->si_fds_len > 0) {
+    // Allocate space for message and file descriptor objects.
+    hdr.msg_controllen = CMSG_SPACE(in->si_fds_len * sizeof(int));
+    hdr.msg_control = calloc(hdr.msg_controllen, 1);
+    if (hdr.msg_control == NULL)
+      return CLOUDABI_ENOMEM;
+    fos = malloc(in->si_fds_len * sizeof(fos[0]));
+    if (fos == NULL) {
+      free(hdr.msg_control);
+      return CLOUDABI_ENOMEM;
+    }
 
+    // Initialize SCM_RIGHTS control message header.
+    struct cmsghdr *chdr = CMSG_FIRSTHDR(&hdr);
+    chdr->cmsg_len = CMSG_LEN(in->si_fds_len * sizeof(int));
+    chdr->cmsg_level = SOL_SOCKET;
+    chdr->cmsg_type = SCM_RIGHTS;
+    unsigned char *data = CMSG_DATA(chdr);
+
+    // Acquire file descriptors that need to remain valid during the
+    // call to sendmsg().
+    struct fd_table *ft = curfds;
+    rwlock_rdlock(&ft->lock);
+    for (size_t i = 0; i < in->si_fds_len; ++i) {
+      error = fd_object_get_locked(&fos[i], ft, in->si_fds[i], 0, 0);
+      if (error != 0) {
+        rwlock_unlock(&ft->lock);
+        goto out;
+      }
+      nfos = i;
+      if (fos[i]->number < 0) {
+        error = CLOUDABI_EBADF;
+        rwlock_unlock(&ft->lock);
+        goto out;
+      }
+      memcpy(data, &fos[i]->number, sizeof(fos[i]->number));
+      data += sizeof(fos[i]->number);
+    }
+    rwlock_unlock(&ft->lock);
+  }
+
+  // Send message.
   struct fd_object *fo;
-  cloudabi_errno_t error = fd_object_get(&fo, sock, CLOUDABI_RIGHT_FD_WRITE, 0);
+  error = fd_object_get(&fo, sock, CLOUDABI_RIGHT_FD_WRITE, 0);
   if (error != 0)
-    return error;
-
+    goto out;
   ssize_t len = sendmsg(fd_number(fo), &hdr, nflags);
   fd_object_release(fo);
-  if (len < 0)
-    return convert_errno(errno);
+  if (len < 0) {
+    error = convert_errno(errno);
+  } else {
+    *out = (cloudabi_send_out_t){
+        .so_datalen = len,
+    };
+  }
 
-  // Convert msghdr to output.
-  *out = (cloudabi_send_out_t){
-      .so_datalen = len,
-  };
-  return 0;
+out:
+  // Free SCM_RIGHTS control message and associated file descriptors.
+  for (size_t i = 0; i < nfos; ++i)
+    fd_object_release(fos[i]);
+  free(fos);
+  free(hdr.msg_control);
+  return error;
 }
 
 static cloudabi_errno_t sys_sock_shutdown(cloudabi_fd_t sock,
