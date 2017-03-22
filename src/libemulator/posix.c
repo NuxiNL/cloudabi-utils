@@ -3021,15 +3021,9 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
   // file descriptors.
   if (in->ri_fds_len > 0) {
     hdr.msg_controllen = CMSG_SPACE(in->ri_fds_len * sizeof(int));
-    hdr.msg_control = calloc(hdr.msg_controllen, 1);
+    hdr.msg_control = malloc(hdr.msg_controllen);
     if (hdr.msg_control == NULL)
       return CLOUDABI_ENOMEM;
-
-    // Initialize SCM_RIGHTS control message header.
-    struct cmsghdr *chdr = CMSG_FIRSTHDR(&hdr);
-    chdr->cmsg_len = CMSG_LEN(in->ri_fds_len * sizeof(int));
-    chdr->cmsg_level = SOL_SOCKET;
-    chdr->cmsg_type = SCM_RIGHTS;
   }
 
   struct fd_object *fo;
