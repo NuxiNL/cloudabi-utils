@@ -421,9 +421,6 @@ static cloudabi_errno_t fd_determine_type_rights(
       case SOCK_DGRAM:
         *type = CLOUDABI_FILETYPE_SOCKET_DGRAM;
         break;
-      case SOCK_SEQPACKET:
-        *type = CLOUDABI_FILETYPE_SOCKET_SEQPACKET;
-        break;
       case SOCK_STREAM:
         *type = CLOUDABI_FILETYPE_SOCKET_STREAM;
         break;
@@ -708,8 +705,6 @@ static cloudabi_errno_t sys_fd_create1(cloudabi_filetype_t type,
     }
     case CLOUDABI_FILETYPE_SOCKET_DGRAM:
       return fd_create_socket(type, SOCK_DGRAM, fd);
-    case CLOUDABI_FILETYPE_SOCKET_SEQPACKET:
-      return fd_create_socket(type, SOCK_SEQPACKET, fd);
     case CLOUDABI_FILETYPE_SOCKET_STREAM:
       return fd_create_socket(type, SOCK_STREAM, fd);
     default:
@@ -742,8 +737,6 @@ static cloudabi_errno_t sys_fd_create2(cloudabi_filetype_t type,
     }
     case CLOUDABI_FILETYPE_SOCKET_DGRAM:
       return fd_create_socketpair(type, SOCK_DGRAM, fd1, fd2);
-    case CLOUDABI_FILETYPE_SOCKET_SEQPACKET:
-      return fd_create_socketpair(type, SOCK_SEQPACKET, fd1, fd2);
     case CLOUDABI_FILETYPE_SOCKET_STREAM:
       return fd_create_socketpair(type, SOCK_STREAM, fd1, fd2);
     default:
@@ -3012,9 +3005,9 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
       .msg_iovlen = in->ri_data_len,
   };
   int nflags = 0;
-  if ((in->ri_flags & CLOUDABI_MSG_PEEK) != 0)
+  if ((in->ri_flags & CLOUDABI_SOCK_RECV_PEEK) != 0)
     nflags |= MSG_PEEK;
-  if ((in->ri_flags & CLOUDABI_MSG_WAITALL) != 0)
+  if ((in->ri_flags & CLOUDABI_SOCK_RECV_WAITALL) != 0)
     nflags |= MSG_WAITALL;
 
   // Provide space for a control message header if we should receive
@@ -3072,11 +3065,9 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
   };
   convert_sockaddr(&ss, hdr.msg_namelen, &out->ro_peername);
   if ((hdr.msg_flags & MSG_CTRUNC) != 0)
-    out->ro_flags |= CLOUDABI_MSG_CTRUNC;
-  if ((hdr.msg_flags & MSG_EOR) != 0)
-    out->ro_flags |= CLOUDABI_MSG_EOR;
+    out->ro_flags |= CLOUDABI_SOCK_RECV_FDS_TRUNCATED;
   if ((hdr.msg_flags & MSG_TRUNC) != 0)
-    out->ro_flags |= CLOUDABI_MSG_TRUNC;
+    out->ro_flags |= CLOUDABI_SOCK_RECV_DATA_TRUNCATED;
   free(hdr.msg_control);
   return 0;
 }
@@ -3088,9 +3079,6 @@ static cloudabi_errno_t sys_sock_send(
   struct msghdr hdr = {
       .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_data_len,
   };
-  int nflags = 0;
-  if ((in->si_flags & CLOUDABI_MSG_EOR) != 0)
-    nflags |= MSG_EOR;
 
   // Attach file descriptors if present.
   cloudabi_errno_t error;
@@ -3142,7 +3130,7 @@ static cloudabi_errno_t sys_sock_send(
   error = fd_object_get(&fo, sock, CLOUDABI_RIGHT_FD_WRITE, 0);
   if (error != 0)
     goto out;
-  ssize_t len = sendmsg(fd_number(fo), &hdr, nflags);
+  ssize_t len = sendmsg(fd_number(fo), &hdr, 0);
   fd_object_release(fo);
   if (len < 0) {
     error = convert_errno(errno);
