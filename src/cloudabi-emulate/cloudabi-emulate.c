@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Nuxi, https://nuxi.nl/
+// Copyright (c) 2016-2017 Nuxi, https://nuxi.nl/
 //
 // This file is distributed under a 2-clause BSD license.
 // See the LICENSE file for details.
@@ -22,8 +22,10 @@ void program_main(const argdata_t *ad) {
   argdata_seq_iterate(ad, &it);
   const argdata_t *fdv, *argv;
   int fd;
-  if (!argdata_seq_next(&it, &fdv) || argdata_get_fd(fdv, &fd) != 0 ||
-      !argdata_seq_next(&it, &argv))
+  if (!argdata_seq_get(&it, &fdv) || argdata_get_fd(fdv, &fd) != 0)
+    _Exit(127);
+  argdata_seq_next(&it);
+  if (!argdata_seq_get(&it, &argv))
     _Exit(127);
 
   // Serialize argument data that needs to be passed to the executable.
