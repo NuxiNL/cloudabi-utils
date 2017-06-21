@@ -35,9 +35,15 @@ void program_main(const argdata_t *ad) {
   argdata_seq_iterate(ad, &it);
   const argdata_t *fdv, *argv;
   int fd;
-  if (!argdata_seq_next(&it, &fdv) || argdata_get_fd(fdv, &fd) != 0 ||
-      !argdata_seq_next(&it, &argv)) {
-    static const char message[] = "Failed to parse argument data\n";
+  if (!argdata_seq_get(&it, &fdv) || argdata_get_fd(fdv, &fd) != 0) {
+    static const char message[] =
+        "Failed to extract executable file descriptor\n";
+    write(2, message, sizeof(message) - 1);
+    _Exit(127);
+  }
+  argdata_seq_next(&it);
+  if (!argdata_seq_get(&it, &argv)) {
+    static const char message[] = "Failed to extract argument data\n";
     write(2, message, sizeof(message) - 1);
     _Exit(127);
   }
