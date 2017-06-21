@@ -158,10 +158,11 @@ void program_main(const argdata_t *ad) {
   argdata_seq_iterator_t it;
   argdata_seq_iterate(ad, &it);
   const argdata_t *value;
-  while (argdata_seq_next(&it, &value)) {
+  while (argdata_seq_get(&it, &value)) {
     int fd;
     if (argdata_get_fd(value, &fd) == 0)
       dprintf(fd, "Hello, world\\n");
+    argdata_seq_next(&it);
   }
   exit(0);
 }
