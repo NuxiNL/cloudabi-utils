@@ -514,7 +514,8 @@ static const argdata_t *parse_seq(yaml_parser_t *parser) {
 // TODO(ed): Add support for connecting sockets.
 static const argdata_t *parse_socket(const yaml_event_t *event,
                                      yaml_parser_t *parser) {
-  const char *typestr = "stream", *bindstr = NULL;
+  const char *typestr = "stream", *addrstr = NULL;
+  bool do_connect;
   for (;;) {
     // Fetch key name and value.
     const argdata_t *key = parse_object(parser);
@@ -533,9 +534,16 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
         exit_parse_error(event, "Bad type attribute: %s", strerror(error));
     } else if (strcmp(keystr, "bind") == 0) {
       // Address on which to bind.
-      error = argdata_get_str_c(value, &bindstr);
+      error = argdata_get_str_c(value, &addrstr);
       if (error != 0)
         exit_parse_error(event, "Bad bind attribute: %s", strerror(error));
+      do_connect = false;
+    } else if (strcmp(keystr, "connect") == 0) {
+      // Address on which to connect.
+      error = argdata_get_str_c(value, &addrstr);
+      if (error != 0)
+        exit_parse_error(event, "Bad connect attribute: %s", strerror(error));
+      do_connect = true;
     } else {
       exit_parse_error(event, "Unknown socket attribute: %s", keystr);
     }
@@ -553,35 +561,35 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     exit_parse_error(event, "Unsupported type attribute: %s", typestr);
 
   // Parse the bind address.
-  if (bindstr == NULL)
-    exit_parse_error(event, "Missing bind attribute");
+  if (addrstr == NULL)
+    exit_parse_error(event, "Missing bind/connect attribute");
   const struct sockaddr *sa;
   socklen_t sal;
   struct sockaddr_un sun;
   struct addrinfo *res = NULL;
-  if (bindstr[0] == '/') {
-    // UNIX socket: bind to path.
+  if (addrstr[0] == '/') {
+    // UNIX socket: bind/connect to path.
     sun.sun_family = AF_UNIX;
-    strncpy(sun.sun_path, bindstr, sizeof(sun.sun_path));
+    strncpy(sun.sun_path, addrstr, sizeof(sun.sun_path));
     if (sun.sun_path[sizeof(sun.sun_path) - 1] != '\0')
-      exit_parse_error(event, "Socket path %s too long", bindstr);
+      exit_parse_error(event, "Socket path %s too long", addrstr);
     sa = (const struct sockaddr *)&sun;
     sal = sizeof(sun);
   } else {
     // IPv4 or IPv6 socket. Extract address and port number.
     const char *hostname_start, *hostname_end, *servname;
-    if (bindstr[0] == '[') {
-      hostname_start = bindstr + 1;
+    if (addrstr[0] == '[') {
+      hostname_start = addrstr + 1;
       hostname_end = strstr(hostname_start, "]:");
       servname = hostname_end + 2;
     } else {
-      hostname_start = bindstr;
+      hostname_start = addrstr;
       hostname_end = strchr(hostname_start, ':');
       servname = hostname_end + 1;
     }
     if (hostname_end == NULL)
       exit_parse_error(event, "Address %s does not contain a port number",
-                       bindstr);
+                       addrstr);
 
     // Resolve address and port number.
     char *hostname = strndup(hostname_start, hostname_end - hostname_start);
@@ -589,10 +597,10 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
     int error = getaddrinfo(hostname, servname, &hint, &res);
     free(hostname);
     if (error != 0)
-      exit_parse_error(event, "Failed to resolve %s: %s", bindstr,
+      exit_parse_error(event, "Failed to resolve %s: %s", addrstr,
                        gai_strerror(error));
     if (res->ai_next != NULL)
-      exit_parse_error(event, "%s resolves to multiple addresses", bindstr);
+      exit_parse_error(event, "%s resolves to multiple addresses", addrstr);
     sa = res->ai_addr;
     sal = res->ai_addrlen;
   }
@@ -600,18 +608,24 @@ static const argdata_t *parse_socket(const yaml_event_t *event,
   // Create socket.
   int fd = socket(sa->sa_family, type, 0);
   if (fd == -1)
-    exit_parse_error(event, "Failed to create socket for %s: %s", bindstr,
+    exit_parse_error(event, "Failed to create socket for %s: %s", addrstr,
                      strerror(errno));
 
-  // Bind.
-  int on = 1;
-  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
-  if (bind(fd, sa, sal) == -1)
-    exit_parse_error(event, "Failed to bind to %s: %s", bindstr,
-                     strerror(errno));
-  if (listen(fd, 0) == -1 && errno != EOPNOTSUPP)
-    exit_parse_error(event, "Failed to listen on %s: %s", bindstr,
-                     strerror(errno));
+  // Bind or connect.
+  if (do_connect) {
+    if (connect(fd, sa, sal) == -1)
+      exit_parse_error(event, "Failed to connect to %s: %s", addrstr,
+                       strerror(errno));
+  } else {
+    int on = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+    if (bind(fd, sa, sal) == -1)
+      exit_parse_error(event, "Failed to bind to %s: %s", addrstr,
+                       strerror(errno));
+    if (listen(fd, 0) == -1 && errno != EOPNOTSUPP)
+      exit_parse_error(event, "Failed to listen on %s: %s", addrstr,
+                       strerror(errno));
+  }
 
   if (res != NULL)
     freeaddrinfo(res);
