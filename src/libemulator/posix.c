@@ -1810,7 +1810,9 @@ static cloudabi_errno_t sys_file_readdir(cloudabi_fd_t fd, void *buf,
     // Craft a directory entry and copy that back.
     size_t namlen = strlen(de->d_name);
     cloudabi_dirent_t cde = {
-        .d_next = fo->directory.offset, .d_ino = de->d_ino, .d_namlen = namlen,
+        .d_next = fo->directory.offset,
+        .d_ino = de->d_ino,
+        .d_namlen = namlen,
     };
     switch (de->d_type) {
       case DT_BLK:
@@ -1931,7 +1933,8 @@ static cloudabi_errno_t sys_file_stat_fget(cloudabi_fd_t fd,
     case CLOUDABI_FILETYPE_PROCESS:
       // TODO(ed): How can we fill in the other fields?
       *buf = (cloudabi_filestat_t){
-          .st_ino = fo->process.pid, .st_nlink = 1,
+          .st_ino = fo->process.pid,
+          .st_nlink = 1,
       };
       ret = 0;
       break;
@@ -2596,7 +2599,9 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
         fos[i] = NULL;
         pfds[i] = (struct pollfd){.fd = -1};
         out[(*nevents)++] = (cloudabi_event_t){
-            .userdata = s->userdata, .error = CLOUDABI_ENOSYS, .type = s->type,
+            .userdata = s->userdata,
+            .error = CLOUDABI_ENOSYS,
+            .type = s->type,
         };
         break;
     }
@@ -3061,7 +3066,8 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
 
   // Convert msghdr to output.
   *out = (cloudabi_recv_out_t){
-      .ro_datalen = datalen, .ro_fdslen = fdslen,
+      .ro_datalen = datalen,
+      .ro_fdslen = fdslen,
   };
   convert_sockaddr(&ss, hdr.msg_namelen, &out->ro_peername);
   if ((hdr.msg_flags & MSG_CTRUNC) != 0)
@@ -3077,7 +3083,8 @@ static cloudabi_errno_t sys_sock_send(
     cloudabi_send_out_t *out) NO_LOCK_ANALYSIS {
   // Convert input to msghdr.
   struct msghdr hdr = {
-      .msg_iov = (struct iovec *)in->si_data, .msg_iovlen = in->si_data_len,
+      .msg_iov = (struct iovec *)in->si_data,
+      .msg_iovlen = in->si_data_len,
   };
 
   // Attach file descriptors if present.

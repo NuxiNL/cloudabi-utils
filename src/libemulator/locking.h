@@ -134,7 +134,8 @@ static inline bool cond_timedwait(struct cond *cond, struct mutex *lock,
                                   uint64_t timeout)
     REQUIRES_EXCLUSIVE(*lock) NO_LOCK_ANALYSIS {
   struct timespec ts = {
-      .tv_sec = timeout / 1000000000, .tv_nsec = timeout % 1000000000,
+      .tv_sec = timeout / 1000000000,
+      .tv_nsec = timeout % 1000000000,
   };
   int ret = pthread_cond_timedwait(&cond->object, &lock->object, &ts);
   assert((ret == 0 || ret == ETIMEDOUT) && "pthread_cond_timedwait() failed");
