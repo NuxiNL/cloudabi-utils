@@ -2799,40 +2799,7 @@ static cloudabi_errno_t sys_random_get(void *buf, size_t nbyte) {
   return 0;
 }
 
-// Converts a socket address structure to a CloudABI socket address.
-static void convert_sockaddr(const struct sockaddr_storage *sa, socklen_t sal,
-                             cloudabi_sockaddr_t *rsa) {
-  // Zero-sized socket address.
-  if (sal <
-      offsetof(struct sockaddr_storage, ss_family) + sizeof(sa->ss_family))
-    return;
-
-  switch (sa->ss_family) {
-    case AF_INET: {
-      if (sal < sizeof(struct sockaddr_in))
-        return;
-      const struct sockaddr_in *sin = (const struct sockaddr_in *)sa;
-      rsa->sa_family = CLOUDABI_AF_INET;
-      memcpy(&rsa->sa_inet.addr, &sin->sin_addr, sizeof(rsa->sa_inet.addr));
-      rsa->sa_inet.port = ntohs(sin->sin_port);
-      return;
-    }
-    case AF_INET6:
-      if (sal < sizeof(struct sockaddr_in6))
-        return;
-      const struct sockaddr_in6 *sin6 = (const struct sockaddr_in6 *)sa;
-      rsa->sa_family = CLOUDABI_AF_INET6;
-      memcpy(&rsa->sa_inet6.addr, &sin6->sin6_addr, sizeof(rsa->sa_inet6.addr));
-      rsa->sa_inet6.port = ntohs(sin6->sin6_port);
-      return;
-    case AF_UNIX:
-      rsa->sa_family = CLOUDABI_AF_UNIX;
-      return;
-  }
-}
-
-static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock,
-                                        cloudabi_sockstat_t *buf,
+static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock, void *unused,
                                         cloudabi_fd_t *conn) {
   // Fetch socket file descriptor and rights.
   struct fd_table *ft = curfds;
@@ -2850,22 +2817,8 @@ static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock,
   rwlock_unlock(&ft->lock);
   cloudabi_filetype_t type = fo->type;
 
-  int nfd;
-  if (buf == NULL) {
-    // No peer address requested.
-    nfd = accept(fd_number(fo), NULL, NULL);
-    fd_object_release(fo);
-  } else {
-    // Peer address requested.
-    struct sockaddr_storage ss;
-    socklen_t sslen = sizeof(ss);
-    nfd = accept(fd_number(fo), (struct sockaddr *)&ss, &sslen);
-    fd_object_release(fo);
-
-    // TODO(ed): How to fill in the other members?
-    *buf = (cloudabi_sockstat_t){};
-    convert_sockaddr(&ss, sslen, &buf->ss_peername);
-  }
+  int nfd = accept(fd_number(fo), NULL, NULL);
+  fd_object_release(fo);
   if (nfd < 0)
     return convert_errno(errno);
   return fd_table_insert_fd(curfds, nfd, type, RIGHTS_SOCKET_BASE & rights,
@@ -2977,6 +2930,7 @@ static cloudabi_errno_t sys_sock_listen(cloudabi_fd_t sock,
 
   int ret = listen(fd_number(fo), backlog);
   if (ret < 0) {
+#if CONFIG_HAS_GETPEERNAME
     if (errno == EINVAL) {
       // Common bug in the BSDs: listen() returns EINVAL both when not
       // bound and when already connected. Determine whether to return
@@ -2988,10 +2942,10 @@ static cloudabi_errno_t sys_sock_listen(cloudabi_fd_t sock,
           errno != ENOTCONN;
       fd_object_release(fo);
       return connected ? CLOUDABI_EINVAL : CLOUDABI_EDESTADDRREQ;
-    } else {
-      fd_object_release(fo);
-      return convert_errno(errno);
     }
+#endif
+    fd_object_release(fo);
+    return convert_errno(errno);
   } else {
     fd_object_release(fo);
     return 0;
@@ -3002,10 +2956,7 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
                                       const cloudabi_recv_in_t *in,
                                       cloudabi_recv_out_t *out) {
   // Convert input to msghdr.
-  struct sockaddr_storage ss;
   struct msghdr hdr = {
-      .msg_name = &ss,
-      .msg_namelen = sizeof(ss),
       .msg_iov = (struct iovec *)in->ri_data,
       .msg_iovlen = in->ri_data_len,
   };
@@ -3069,7 +3020,6 @@ static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
       .ro_datalen = datalen,
       .ro_fdslen = fdslen,
   };
-  convert_sockaddr(&ss, hdr.msg_namelen, &out->ro_peername);
   if ((hdr.msg_flags & MSG_CTRUNC) != 0)
     out->ro_flags |= CLOUDABI_SOCK_RECV_FDS_TRUNCATED;
   if ((hdr.msg_flags & MSG_TRUNC) != 0)
@@ -3195,17 +3145,8 @@ static cloudabi_errno_t sys_sock_stat_get(cloudabi_fd_t sock,
   if (error != 0)
     return error;
 
-  // Fetch and convert socket and peer addresses.
-  *buf = (cloudabi_sockstat_t){};
-  struct sockaddr_storage ss;
-  socklen_t sslen = sizeof(ss);
-  if (getsockname(fd_number(fo), (struct sockaddr *)&ss, &sslen) == 0)
-    convert_sockaddr(&ss, sslen, &buf->ss_sockname);
-  sslen = sizeof(ss);
-  if (getpeername(fd_number(fo), (struct sockaddr *)&ss, &sslen) == 0)
-    convert_sockaddr(&ss, sslen, &buf->ss_peername);
-
   // Fill ss_error.
+  *buf = (cloudabi_sockstat_t){};
   if ((flags & CLOUDABI_SOCKSTAT_CLEAR_ERROR) != 0) {
     int err;
     socklen_t errlen = sizeof(err);

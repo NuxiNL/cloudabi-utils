@@ -48,16 +48,16 @@
 #define CONFIG_HAS_CONNECTAT_STRING 0
 #endif
 
-#if defined(__CloudABI__)
-#define CONFIG_HAS_PDFORK 1
-#else
-#define CONFIG_HAS_PDFORK 0
-#endif
-
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #define CONFIG_HAS_FDATASYNC 1
 #else
 #define CONFIG_HAS_FDATASYNC 0
+#endif
+
+#if !defined(__CloudABI__)
+#define CONFIG_HAS_GETPEERNAME 1
+#else
+#define CONFIG_HAS_GETPEERNAME 0
 #endif
 
 #ifndef __CloudABI__
@@ -76,6 +76,12 @@
 #define CONFIG_HAS_KQUEUE 1
 #else
 #define CONFIG_HAS_KQUEUE 0
+#endif
+
+#if defined(__CloudABI__)
+#define CONFIG_HAS_PDFORK 1
+#else
+#define CONFIG_HAS_PDFORK 0
 #endif
 
 #ifndef __APPLE__
