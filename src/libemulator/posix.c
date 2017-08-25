@@ -650,15 +650,6 @@ static cloudabi_errno_t sys_fd_close(cloudabi_fd_t fd) {
   return 0;
 }
 
-static cloudabi_errno_t fd_create_socket(cloudabi_filetype_t type, int socktype,
-                                         cloudabi_fd_t *fd) {
-  int nfd = socket(AF_UNIX, socktype, 0);
-  if (nfd < 0)
-    return convert_errno(errno);
-  return fd_table_insert_fd(curfds, nfd, type, RIGHTS_SOCKET_BASE,
-                            RIGHTS_SOCKET_INHERITING, fd);
-}
-
 static cloudabi_errno_t sys_fd_create1(cloudabi_filetype_t type,
                                        cloudabi_fd_t *fd) {
   switch (type) {
@@ -703,10 +694,6 @@ static cloudabi_errno_t sys_fd_create1(cloudabi_filetype_t type,
       return fd_table_insert_fd(curfds, nfd, type, RIGHTS_SHARED_MEMORY_BASE,
                                 RIGHTS_SHARED_MEMORY_INHERITING, fd);
     }
-    case CLOUDABI_FILETYPE_SOCKET_DGRAM:
-      return fd_create_socket(type, SOCK_DGRAM, fd);
-    case CLOUDABI_FILETYPE_SOCKET_STREAM:
-      return fd_create_socket(type, SOCK_STREAM, fd);
     default:
       return CLOUDABI_EINVAL;
   }
@@ -1533,10 +1520,7 @@ static void path_put(struct path_access *pa) UNLOCKS(pa->fd_object->refcount) {
 #define HAS_UTIMENS 0
 #endif
 
-#define HAS_CWD_LOCK                                            \
-  (!HAS_UTIMENS || !CONFIG_HAS_MKFIFOAT ||                      \
-   !(CONFIG_HAS_BINDAT_SOCKADDR || CONFIG_HAS_BINDAT_STRING) || \
-   !(CONFIG_HAS_CONNECTAT_SOCKADDR || CONFIG_HAS_CONNECTAT_STRING))
+#define HAS_CWD_LOCK (!HAS_UTIMENS || !CONFIG_HAS_MKFIFOAT)
 
 #if HAS_CWD_LOCK
 
@@ -2823,133 +2807,6 @@ static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock, void *unused,
     return convert_errno(errno);
   return fd_table_insert_fd(curfds, nfd, type, RIGHTS_SOCKET_BASE & rights,
                             RIGHTS_SOCKET_INHERITING & rights, conn);
-}
-
-static cloudabi_errno_t sys_sock_bind(cloudabi_fd_t sock, cloudabi_fd_t fd,
-                                      const char *path, size_t pathlen) {
-  struct fd_object *fo;
-  cloudabi_errno_t error =
-      fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_BIND_SOCKET, 0);
-  if (error != 0)
-    return error;
-
-  struct path_access pa;
-  error = path_get_nofollow(&pa, fd, path, pathlen,
-                            CLOUDABI_RIGHT_SOCK_BIND_DIRECTORY, 0, true);
-  if (error != 0) {
-    fd_object_release(fo);
-    return error;
-  }
-
-#if CONFIG_HAS_BINDAT_STRING
-  int ret = bindat(fd_number(fo), pa.fd, pa.path);
-#else
-  struct sockaddr_un sun;
-  sun.sun_family = AF_UNIX;
-  if (strlcpy(sun.sun_path, pa.path, sizeof(sun.sun_path)) >=
-      sizeof(sun.sun_path)) {
-    fd_object_release(fo);
-    path_put(&pa);
-    return CLOUDABI_ENAMETOOLONG;
-  }
-#if CONFIG_HAS_BINDAT_SOCKADDR
-  int ret = bindat(pa.fd, fd_number(fo), (struct sockaddr *)&sun, sizeof(sun));
-#else
-  error = cwd_get(&pa);
-  if (error != 0) {
-    fd_object_release(fo);
-    path_put(&pa);
-    return error;
-  }
-  int ret = bind(fd_number(fo), (struct sockaddr *)&sun, sizeof(sun));
-  cwd_put();
-#endif
-#endif
-  fd_object_release(fo);
-  path_put(&pa);
-  if (ret < 0)
-    return convert_errno(errno);
-  return 0;
-}
-
-static cloudabi_errno_t sys_sock_connect(cloudabi_fd_t sock, cloudabi_fd_t fd,
-                                         const char *path, size_t pathlen) {
-  struct fd_object *fo;
-  cloudabi_errno_t error =
-      fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_CONNECT_SOCKET, 0);
-  if (error != 0)
-    return error;
-
-  struct path_access pa;
-  error = path_get_nofollow(&pa, fd, path, pathlen,
-                            CLOUDABI_RIGHT_SOCK_CONNECT_DIRECTORY, 0, false);
-  if (error != 0) {
-    fd_object_release(fo);
-    return error;
-  }
-
-#if CONFIG_HAS_CONNECTAT_STRING
-  int ret = connectat(fd_number(fo), pa.fd, pa.path);
-#else
-  struct sockaddr_un sun;
-  sun.sun_family = AF_UNIX;
-  if (strlcpy(sun.sun_path, pa.path, sizeof(sun.sun_path)) >=
-      sizeof(sun.sun_path)) {
-    fd_object_release(fo);
-    path_put(&pa);
-    return CLOUDABI_ENAMETOOLONG;
-  }
-#if CONFIG_HAS_CONNECTAT_SOCKADDR
-  int ret =
-      connectat(pa.fd, fd_number(fo), (struct sockaddr *)&sun, sizeof(sun));
-#else
-  error = cwd_get(&pa);
-  if (error != 0) {
-    fd_object_release(fo);
-    path_put(&pa);
-    return error;
-  }
-  int ret = connect(fd_number(fo), (struct sockaddr *)&sun, sizeof(sun));
-  cwd_put();
-#endif
-#endif
-  fd_object_release(fo);
-  path_put(&pa);
-  if (ret < 0)
-    return convert_errno(errno);
-  return 0;
-}
-
-static cloudabi_errno_t sys_sock_listen(cloudabi_fd_t sock,
-                                        cloudabi_backlog_t backlog) {
-  struct fd_object *fo;
-  cloudabi_errno_t error =
-      fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_LISTEN, 0);
-  if (error != 0)
-    return error;
-
-  int ret = listen(fd_number(fo), backlog);
-  if (ret < 0) {
-#if CONFIG_HAS_GETPEERNAME
-    if (errno == EINVAL) {
-      // Common bug in the BSDs: listen() returns EINVAL both when not
-      // bound and when already connected. Determine whether to return
-      // EINVAL or EDESTADDRREQ.
-      struct sockaddr_storage ss;
-      socklen_t sslen = sizeof(ss);
-      bool connected =
-          getpeername(fd_number(fo), (struct sockaddr *)&ss, &sslen) == 0 ||
-          errno != ENOTCONN;
-      fd_object_release(fo);
-      return connected ? CLOUDABI_EINVAL : CLOUDABI_EDESTADDRREQ;
-    }
-#endif
-    fd_object_release(fo);
-    return convert_errno(errno);
-  } else {
-    fd_object_release(fo);
-    return 0;
-  }
 }
 
 static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,

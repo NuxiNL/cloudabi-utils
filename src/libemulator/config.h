@@ -12,18 +12,6 @@
 #define CONFIG_HAS_ARC4RANDOM_BUF 0
 #endif
 
-#ifdef __FreeBSD__
-#define CONFIG_HAS_BINDAT_SOCKADDR 1
-#else
-#define CONFIG_HAS_BINDAT_SOCKADDR 0
-#endif
-
-#ifdef __CloudABI__
-#define CONFIG_HAS_BINDAT_STRING 1
-#else
-#define CONFIG_HAS_BINDAT_STRING 0
-#endif
-
 #if defined(__CloudABI__)
 #define CONFIG_HAS_CAP_ENTER 1
 #else
@@ -36,28 +24,10 @@
 #define CONFIG_HAS_CLOCK_NANOSLEEP 0
 #endif
 
-#ifdef __FreeBSD__
-#define CONFIG_HAS_CONNECTAT_SOCKADDR 1
-#else
-#define CONFIG_HAS_CONNECTAT_SOCKADDR 0
-#endif
-
-#ifdef __CloudABI__
-#define CONFIG_HAS_CONNECTAT_STRING 1
-#else
-#define CONFIG_HAS_CONNECTAT_STRING 0
-#endif
-
 #if !defined(__APPLE__) && !defined(__FreeBSD__)
 #define CONFIG_HAS_FDATASYNC 1
 #else
 #define CONFIG_HAS_FDATASYNC 0
-#endif
-
-#if !defined(__CloudABI__)
-#define CONFIG_HAS_GETPEERNAME 1
-#else
-#define CONFIG_HAS_GETPEERNAME 0
 #endif
 
 #ifndef __CloudABI__
