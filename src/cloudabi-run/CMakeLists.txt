@@ -1,13 +1,12 @@
 include(FindPkgConfig)
 include(GNUInstallDirs)
 
-pkg_search_module(YAML REQUIRED yaml yaml-0.1)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
-include_directories(${YAML_INCLUDE_DIRS})
-link_directories(${YAML_LIBRARY_DIRS})
-
-add_executable(cloudabi-run cloudabi-run.c)
-target_link_libraries(cloudabi-run cloudabi emulator ${YAML_LIBRARIES})
+add_executable(cloudabi-run cloudabi-run.cc yaml_file_descriptor_factory.cc)
+target_link_libraries(cloudabi-run cloudabi emulator yaml-cpp)
 
 install(TARGETS cloudabi-run
         DESTINATION ${CMAKE_INSTALL_BINDIR})
