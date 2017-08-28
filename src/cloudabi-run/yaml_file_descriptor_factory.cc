@@ -26,6 +26,7 @@
 
 #include "yaml_file_descriptor_factory.h"
 
+using arpc::ArgdataParser;
 using arpc::Channel;
 using arpc::ClientContext;
 using arpc::CreateChannel;
@@ -102,12 +103,16 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
   } else if (tag == "tag:nuxi.nl,2015:cloudabi/flower_switchboard_handle") {
     // Create a Flower switchboard handle for network connectivity.
     std::optional<std::string_view> switchboard_path;
+    ArgdataParser parser;
+    ConstrainRequest request;
     for (size_t i = 0; i < keys.size(); ++i) {
       std::optional<std::string_view> keystr = keys[i]->get_str();
       if (!keystr)
         throw YAML::ParserException(mark, "Expected string keys");
       if (*keystr == "switchboard_path") {
         switchboard_path = values[i]->get_str();
+      } else if (*keystr == "constraints") {
+        request.Parse(*values[i], &parser);
       } else {
         std::ostringstream ss;
         ss << "Unsupported attribute: " << *keystr;
@@ -117,6 +122,7 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
     if (!switchboard_path)
       throw YAML::ParserException(mark, "Missing switchboard_path attribute");
 
+    // Connect to the switchboard.
     std::unique_ptr<FileDescriptor> root_handle;
     {
       int s = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -129,6 +135,7 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
         struct sockaddr_un sun;
         struct sockaddr sa;
       } address;
+      address.sun.sun_family = AF_UNIX;
       if (switchboard_path->size() >= std::size(address.sun.sun_path))
         throw YAML::ParserException(mark, "Switchboard path too long");
       std::copy(switchboard_path->begin(), switchboard_path->end(),
@@ -139,12 +146,10 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
                       std::strerror(errno));
     }
 
+    // Create a constrained channel.
     std::shared_ptr<Channel> channel = CreateChannel(std::move(root_handle));
     std::unique_ptr<Switchboard::Stub> stub = Switchboard::NewStub(channel);
-
-    // TODO(ed): Fill constrain request properly!
     ClientContext context;
-    ConstrainRequest request;
     ConstrainResponse response;
     if (Status status = stub->Constrain(&context, request, &response);
         !status.ok())
