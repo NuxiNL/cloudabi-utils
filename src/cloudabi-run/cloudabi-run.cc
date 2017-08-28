@@ -51,7 +51,7 @@ namespace {
   std::exit(127);
 }
 
-} // namespace
+}  // namespace
 
 int main(int argc, char *argv[]) {
   // Parse command line options.
@@ -59,12 +59,12 @@ int main(int argc, char *argv[]) {
   int c;
   while ((c = getopt(argc, argv, "e")) != -1) {
     switch (c) {
-    case 'e':
-      // Run program using emulation.
-      do_emulate = true;
-      break;
-    default:
-      usage();
+      case 'e':
+        // Run program using emulation.
+        do_emulate = true;
+        break;
+      default:
+        usage();
     }
   }
   argv += optind;

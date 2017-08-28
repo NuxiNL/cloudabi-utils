@@ -9,34 +9,37 @@
 #include <string_view>
 #include <vector>
 
-#include <argdata.hpp>
+#include <arpc++/arpc++.h>
 #include <yaml-cpp/mark.h>
 #include <yaml2argdata/yaml_factory.h>
+#include <argdata.hpp>
 
 namespace cloudabi_run {
 
 class YAMLFileDescriptorFactory
     : public yaml2argdata::YAMLFactory<const argdata_t *> {
-public:
+ public:
   YAMLFileDescriptorFactory(YAMLFactory<const argdata_t *> *fallback)
-      : fallback_(fallback) {}
+      : fallback_(fallback) {
+  }
 
   const argdata_t *GetNull(const YAML::Mark &mark) override;
   const argdata_t *GetScalar(const YAML::Mark &mark, std::string_view tag,
                              std::string_view value) override;
-  const argdata_t *
-  GetSequence(const YAML::Mark &mark, std::string_view tag,
-              std::vector<const argdata_t *> elements) override;
+  const argdata_t *GetSequence(
+      const YAML::Mark &mark, std::string_view tag,
+      std::vector<const argdata_t *> elements) override;
   const argdata_t *GetMap(const YAML::Mark &mark, std::string_view tag,
                           std::vector<const argdata_t *> keys,
                           std::vector<const argdata_t *> values) override;
 
-private:
+ private:
   YAMLFactory<const argdata_t *> *const fallback_;
 
   std::vector<std::unique_ptr<argdata_t>> argdatas_;
+  std::vector<std::shared_ptr<arpc::FileDescriptor>> fds_;
 };
 
-} // namespace cloudabi_run
+}  // namespace cloudabi_run
 
 #endif
