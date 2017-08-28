@@ -443,8 +443,7 @@ static cloudabi_errno_t futex_queue_sleep(struct futex_queue *fq,
                                           cloudabi_timestamp_t timeout) {
   // Initialize futex_waiter object.
   struct futex_waiter fw = {
-      .fw_tid = tid,
-      .fw_queue = fq,
+      .fw_tid = tid, .fw_queue = fq,
   };
   switch (clock_id) {
 #if HAS_COND_INIT_MONOTONIC

@@ -135,9 +135,8 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
                 address.sun.sun_path);
       if (connect(root_handle->get(), &address.sa, sizeof(address)) != 0)
         throw YAML::ParserException(
-            mark,
-            std::string("Failed to connect to the switchboard: ") +
-                std::strerror(errno));
+            mark, std::string("Failed to connect to the switchboard: ") +
+                      std::strerror(errno));
     }
 
     std::shared_ptr<Channel> channel = CreateChannel(std::move(root_handle));
@@ -150,9 +149,8 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
     if (Status status = stub->Constrain(&context, request, &response);
         !status.ok())
       throw YAML::ParserException(
-          mark,
-          std::string("Failed to constrain switchboard channel: ") +
-              status.error_message());
+          mark, std::string("Failed to constrain switchboard channel: ") +
+                    status.error_message());
     if (!response.switchboard())
       throw YAML::ParserException(
           mark, "Switchboard did not return a file descriptor");
