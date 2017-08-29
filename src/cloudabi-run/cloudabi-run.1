@@ -1,4 +1,4 @@
-.\" Copyright (c) 2015 Nuxi, https://nuxi.nl/
+.\" Copyright (c) 2015-2017 Nuxi, https://nuxi.nl/
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -21,7 +21,7 @@
 .\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
-.Dd July 20, 2017
+.Dd August 29, 2017
 .Dt CLOUDABI-RUN 1
 .Os
 .Sh NAME
@@ -117,33 +117,20 @@ File objects have the following attributes:
 .It Cm "path: str"
 The path of the file.
 .El
-.It Cm "tag:nuxi.nl,2015:cloudabi/socket: map"
-Creates a socket and binds or connects it to a specified address.
-Socket objects have the following attributes:
+.It Cm "tag:nuxi.nl,2015:cloudabi/flower_switchboard_channel: map"
+Creates a channel to a Flower switchboard instance.
+The Flower switchboard is a daemon that allows programs to access the
+network in a capability-based fashion.
+These objects have the following attributes:
 .Bl -tag -width "Four"
-.It Cm "bind: str"
-The address to which the socket should be bound.
-If the address starts with a
-.Pa / ,
-this creates a UNIX domain socket and binds it to the path provided.
-Otherwise,
-it resolves the address using
-.Xr getaddrinfo 3 .
-.It Cm "connect: str"
-The address to which the socket should be connected.
-This attribute is mutually exclusive with
-.Cm bind .
-.It Cm "type: str"
-Socket type. Valid types are
-.Dq Li dgram
-for datagram sockets,
-.Dq Li seqpacket
-for sequenced-packet sockets ,
-and
-.Dq Li stream
-for stream sockets.
-The default value is
-.Dq Li stream .
+.It Cm "switchboard_path: str"
+The path at which the Flower switchboard daemon has bound its UNIX
+domain socket.
+.It Cm "constraints: flower.protocol.switchboard.ConstrainRequest"
+Security constraints that should be placed on the handle provided to the
+process.
+This allows for restricting access to parts of the switchboard's address
+space.
 .El
 .El
 .Sh EXAMPLES
@@ -183,41 +170,104 @@ Hello, world
 Hello, world
 .Ed
 .Pp
-Below is a simple web server that writes simple responses to incoming
-requests.
-With the configuration provided,
+Below is a web server that writes fixed responses to incoming requests.
+With the commands invoked,
 it listens on TCP port 12345.
 .Bd -literal -offset indent
-$ cat webserver.c
+$ cat webserver.cc
 #include <sys/socket.h>
 
-#include <argdata.h>
 #include <program.h>
-#include <stdlib.h>
 #include <unistd.h>
 
-void program_main(const argdata_t *ad) {
-  int sockfd;
-  if (argdata_get_fd(ad, &sockfd) == 0) {
-    int connfd;
-    while ((connfd = accept(sockfd, NULL, NULL)) >= 0) {
-      const char buf[] = "HTTP/1.1 200 OK\\r\\n"
-                         "Content-Type: text/plain\\r\\n"
-                         "Content-Length: 13\\r\\n\\r\\n"
-                         "Hello, world\\n";
-      write(connfd, buf, sizeof(buf) - 1);
-      close(connfd);
-    }
+#include <cstdlib>
+#include <memory>
+#include <thread>
+
+#include <arpc++/arpc++.h>
+#include <flower/protocol/server.ad.h>
+#include <flower/protocol/switchboard.ad.h>
+#include <argdata.hpp>
+
+using arpc::ClientContext;
+using arpc::CreateChannel;
+using arpc::FileDescriptor;
+using arpc::ServerBuilder;
+using arpc::ServerContext;
+using arpc::Status;
+using flower::protocol::server::ConnectRequest;
+using flower::protocol::server::ConnectResponse;
+using flower::protocol::server::Server;
+using flower::protocol::switchboard::ServerStartRequest;
+using flower::protocol::switchboard::ServerStartResponse;
+using flower::protocol::switchboard::Switchboard;
+
+namespace {
+
+class FixedResponseServer : public Server::Service {
+ public:
+  Status Connect(ServerContext* context, const ConnectRequest* request,
+                 ConnectResponse* response) override {
+    // Process the request asynchronously.
+    std::thread([connection{request->client()}]() {
+      // Write a fixed HTTP response.
+      const char response[] =
+          "HTTP/1.1 200 OK\\r\\n"
+          "Content-Type: text/plain\\r\\n"
+          "Content-Length: 13\\r\\n\\r\\n"
+          "Hello, world\\n";
+      write(connection->get(), response, sizeof(response) - 1);
+
+      // Wait for the client to close the connection.
+      shutdown(connection->get(), SHUT_WR);
+      char discard[4096];
+      while (read(connection->get(), discard, sizeof(discard)) > 0) {
+      }
+      close(connection->get());
+    })
+        .detach();
+    return Status::OK;
   }
-  exit(1);
+};
+
+}  // namespace
+
+void program_main(const argdata_t* ad) {
+  // Start a server through the switchboard.
+  ServerStartResponse response;
+  {
+    std::shared_ptr<Switchboard::Stub> stub = Switchboard::NewStub(
+        CreateChannel(std::make_unique<FileDescriptor>(ad->as_fd())));
+    ClientContext context;
+    ServerStartRequest request;
+    if (Status status = stub->ServerStart(&context, request, &response);
+        !status.ok())
+      std::exit(1);
+  }
+
+  // Process incoming requests.
+  ServerBuilder builder(response.server());
+  FixedResponseServer fixed_response_server;
+  builder.RegisterService(&fixed_response_server);
+  for (auto server = builder.Build(); server->HandleRequest() == 0;) {
+  }
+  std::exit(1);
 }
 $ cat webserver.yaml
 %TAG ! tag:nuxi.nl,2015:cloudabi/
 ---
-!socket
-  bind: '[::]:12345'
-$ x86_64-unknown-cloudabi-cc -o webserver webserver.c
-$ cloudabi-run webserver < webserver.yaml
+!flower_switchboard_handle
+  switchboard_path: /tmp/switchboard
+  constraints:
+    rights: [SERVER_START]
+    in_labels:
+      prog: webserver
+$ x86_64-unknown-cloudabi-c++ -o webserver webserver.cc -std=c++1z -larpc
+$ flower_switchboard /tmp/switchboard &
+$ cloudabi-run webserver < webserver.yaml &
+$ flower_ingress_accept 0.0.0.0:12345 /tmp/switchboard '{"prog": "webserver"}' &
+$ curl http://localhost:12345/
+Hello, world
 .Ed
 .Sh IMPLEMENTATION NOTES
 .Nm
