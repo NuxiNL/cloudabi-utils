@@ -10,9 +10,9 @@
 // This data is converted to argument data (argdata_t) that can be
 // accessed from program_main().
 //
-// !fd, !file and !socket nodes in the YAML file are converted to file
-// descriptor entries in the argument data, meaning they will be
-// available within the CloudABI process.
+// !fd, !file and !flower_switchboard_handle nodes in the YAML file are
+// converted to file descriptor entries in the argument data, meaning
+// they will be available within the CloudABI process.
 
 #include <argdata.h>
 #include <fcntl.h>
