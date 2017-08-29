@@ -2778,32 +2778,6 @@ static cloudabi_errno_t sys_random_get(void *buf, size_t nbyte) {
   return 0;
 }
 
-static cloudabi_errno_t sys_sock_accept(cloudabi_fd_t sock, void *unused,
-                                        cloudabi_fd_t *conn) {
-  // Fetch socket file descriptor and rights.
-  struct fd_table *ft = curfds;
-  rwlock_wrlock(&ft->lock);
-  struct fd_entry *fe;
-  cloudabi_errno_t error =
-      fd_table_get_entry(ft, sock, CLOUDABI_RIGHT_SOCK_ACCEPT, 0, &fe);
-  if (error != 0) {
-    rwlock_unlock(&ft->lock);
-    return error;
-  }
-  cloudabi_rights_t rights = fe->rights_inheriting;
-  struct fd_object *fo = fe->object;
-  refcount_acquire(&fo->refcount);
-  rwlock_unlock(&ft->lock);
-  cloudabi_filetype_t type = fo->type;
-
-  int nfd = accept(fd_number(fo), NULL, NULL);
-  fd_object_release(fo);
-  if (nfd < 0)
-    return convert_errno(errno);
-  return fd_table_insert_fd(curfds, nfd, type, RIGHTS_SOCKET_BASE & rights,
-                            RIGHTS_SOCKET_INHERITING & rights, conn);
-}
-
 static cloudabi_errno_t sys_sock_recv(cloudabi_fd_t sock,
                                       const cloudabi_recv_in_t *in,
                                       cloudabi_recv_out_t *out) {
@@ -2982,45 +2956,6 @@ static cloudabi_errno_t sys_sock_shutdown(cloudabi_fd_t sock,
   fd_object_release(fo);
   if (ret < 0)
     return convert_errno(errno);
-  return 0;
-}
-
-static cloudabi_errno_t sys_sock_stat_get(cloudabi_fd_t sock,
-                                          cloudabi_sockstat_t *buf,
-                                          cloudabi_ssflags_t flags) {
-  struct fd_object *fo;
-  cloudabi_errno_t error =
-      fd_object_get(&fo, sock, CLOUDABI_RIGHT_SOCK_STAT_GET, 0);
-  if (error != 0)
-    return error;
-
-  // Fill ss_error.
-  *buf = (cloudabi_sockstat_t){};
-  if ((flags & CLOUDABI_SOCKSTAT_CLEAR_ERROR) != 0) {
-    int err;
-    socklen_t errlen = sizeof(err);
-    if (getsockopt(fd_number(fo), SOL_SOCKET, SO_ERROR, &err, &errlen) == -1) {
-      fd_object_release(fo);
-      return convert_errno(errno);
-    }
-    if (err != 0)
-      buf->ss_error = convert_errno(err);
-  }
-
-  // Fill ss_state.
-  int acceptconn;
-  socklen_t acceptconnlen = sizeof(acceptconn);
-  if (getsockopt(fd_number(fo), SOL_SOCKET, SO_ACCEPTCONN, &acceptconn,
-                 &acceptconnlen) == -1) {
-    if (errno != ENOPROTOOPT) {
-      fd_object_release(fo);
-      return convert_errno(errno);
-    }
-  } else if (acceptconn) {
-    buf->ss_state |= CLOUDABI_SOCKSTATE_ACCEPTCONN;
-  }
-
-  fd_object_release(fo);
   return 0;
 }
 
