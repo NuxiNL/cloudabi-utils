@@ -134,7 +134,7 @@ const argdata_t *YAMLFileDescriptorFactory::GetMap(
       union {
         struct sockaddr_un sun;
         struct sockaddr sa;
-      } address;
+      } address = {};
       address.sun.sun_family = AF_UNIX;
       if (switchboard_path->size() >= std::size(address.sun.sun_path))
         throw YAML::ParserException(mark, "Switchboard path too long");
