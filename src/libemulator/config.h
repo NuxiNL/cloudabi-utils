@@ -36,12 +36,6 @@
 #define CONFIG_HAS_ISATTY 0
 #endif
 
-#ifndef __APPLE__
-#define CONFIG_HAS_MKFIFOAT 1
-#else
-#define CONFIG_HAS_MKFIFOAT 0
-#endif
-
 #if defined(__APPLE__) || defined(__CloudABI__) || defined(__FreeBSD__)
 #define CONFIG_HAS_KQUEUE 1
 #else

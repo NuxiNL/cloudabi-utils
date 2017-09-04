@@ -404,10 +404,6 @@ static cloudabi_errno_t fd_determine_type_rights(
     *type = CLOUDABI_FILETYPE_DIRECTORY;
     *rights_base = RIGHTS_DIRECTORY_BASE;
     *rights_inheriting = RIGHTS_DIRECTORY_INHERITING;
-  } else if (S_ISFIFO(sb.st_mode)) {
-    *type = CLOUDABI_FILETYPE_FIFO;
-    *rights_base = RIGHTS_FIFO_BASE;
-    *rights_inheriting = RIGHTS_FIFO_INHERITING;
   } else if (S_ISREG(sb.st_mode)) {
     *type = CLOUDABI_FILETYPE_REGULAR_FILE;
     *rights_base = RIGHTS_REGULAR_FILE_BASE;
@@ -427,6 +423,10 @@ static cloudabi_errno_t fd_determine_type_rights(
       default:
         return CLOUDABI_EINVAL;
     }
+    *rights_base = RIGHTS_SOCKET_BASE;
+    *rights_inheriting = RIGHTS_SOCKET_INHERITING;
+  } else if (S_ISFIFO(sb.st_mode)) {
+    *type = CLOUDABI_FILETYPE_SOCKET_STREAM;
     *rights_base = RIGHTS_SOCKET_BASE;
     *rights_inheriting = RIGHTS_SOCKET_INHERITING;
 #ifdef S_TYPEISPROC
@@ -713,15 +713,6 @@ static cloudabi_errno_t fd_create_socketpair(cloudabi_filetype_t type,
 static cloudabi_errno_t sys_fd_create2(cloudabi_filetype_t type,
                                        cloudabi_fd_t *fd1, cloudabi_fd_t *fd2) {
   switch (type) {
-    case CLOUDABI_FILETYPE_FIFO: {
-      int fds[2];
-      if (pipe(fds) < 0)
-        return convert_errno(errno);
-      return fd_table_insert_fdpair(curfds, fds, type,
-                                    RIGHTS_FIFO_BASE & ~CLOUDABI_RIGHT_FD_WRITE,
-                                    RIGHTS_FIFO_BASE & ~CLOUDABI_RIGHT_FD_READ,
-                                    RIGHTS_FIFO_INHERITING, fd1, fd2);
-    }
     case CLOUDABI_FILETYPE_SOCKET_DGRAM:
       return fd_create_socketpair(type, SOCK_DGRAM, fd1, fd2);
     case CLOUDABI_FILETYPE_SOCKET_STREAM:
@@ -1520,7 +1511,7 @@ static void path_put(struct path_access *pa) UNLOCKS(pa->fd_object->refcount) {
 #define HAS_UTIMENS 0
 #endif
 
-#define HAS_CWD_LOCK (!HAS_UTIMENS || !CONFIG_HAS_MKFIFOAT)
+#define HAS_CWD_LOCK !HAS_UTIMENS
 
 #if HAS_CWD_LOCK
 
@@ -1559,29 +1550,6 @@ static cloudabi_errno_t sys_file_create(cloudabi_fd_t fd, const char *path,
         return error;
 
       int ret = mkdirat(pa.fd, pa.path, 0777);
-      path_put(&pa);
-      if (ret < 0)
-        return convert_errno(errno);
-      return 0;
-    }
-    case CLOUDABI_FILETYPE_FIFO: {
-      struct path_access pa;
-      cloudabi_errno_t error = path_get_nofollow(
-          &pa, fd, path, pathlen, CLOUDABI_RIGHT_FILE_CREATE_FIFO, 0, true);
-      if (error != 0)
-        return error;
-
-#if CONFIG_HAS_MKFIFOAT
-      int ret = mkfifoat(pa.fd, pa.path, 0777);
-#else
-      error = cwd_get(&pa);
-      if (error != 0) {
-        path_put(&pa);
-        return error;
-      }
-      int ret = mkfifo(pa.path, 0777);
-      cwd_put();
-#endif
       path_put(&pa);
       if (ret < 0)
         return convert_errno(errno);
@@ -1807,7 +1775,7 @@ static cloudabi_errno_t sys_file_readdir(cloudabi_fd_t fd, void *buf,
         cde.d_type = CLOUDABI_FILETYPE_DIRECTORY;
         break;
       case DT_FIFO:
-        cde.d_type = CLOUDABI_FILETYPE_FIFO;
+        cde.d_type = CLOUDABI_FILETYPE_SOCKET_STREAM;
         break;
       case DT_LNK:
         cde.d_type = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
@@ -2106,7 +2074,7 @@ static cloudabi_errno_t sys_file_stat_get(cloudabi_lookup_t fd,
   else if (S_ISDIR(sb.st_mode))
     buf->st_filetype = CLOUDABI_FILETYPE_DIRECTORY;
   else if (S_ISFIFO(sb.st_mode))
-    buf->st_filetype = CLOUDABI_FILETYPE_FIFO;
+    buf->st_filetype = CLOUDABI_FILETYPE_SOCKET_STREAM;
   else if (S_ISLNK(sb.st_mode))
     buf->st_filetype = CLOUDABI_FILETYPE_SYMBOLIC_LINK;
   else if (S_ISREG(sb.st_mode))
