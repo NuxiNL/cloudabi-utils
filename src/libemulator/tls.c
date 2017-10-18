@@ -110,7 +110,8 @@ void tls_init(struct tls *tls, const cloudabi_syscalls_t *forward) {
   static bool handler_set_up = false;
   if (!handler_set_up) {
     struct sigaction sa = {
-        .sa_sigaction = handle_sigsegv, .sa_flags = SA_SIGINFO,
+        .sa_sigaction = handle_sigsegv,
+        .sa_flags = SA_SIGINFO,
     };
     sigemptyset(&sa.sa_mask);
     sigaction(SIGSEGV, &sa, NULL);

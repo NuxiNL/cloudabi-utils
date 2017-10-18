@@ -179,9 +179,11 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
           {
               .e_ident =
                   {
-                          [EI_MAG0] = ELFMAG0, [EI_MAG1] = ELFMAG1,
-                          [EI_MAG2] = ELFMAG2, [EI_MAG3] = ELFMAG3,
-                          [EI_OSABI] = ELFOSABI_CLOUDABI,
+                      [EI_MAG0] = ELFMAG0,
+                      [EI_MAG1] = ELFMAG1,
+                      [EI_MAG2] = ELFMAG2,
+                      [EI_MAG3] = ELFMAG3,
+                      [EI_OSABI] = ELFOSABI_CLOUDABI,
                   },
               .e_type = ET_DYN,
               .e_machine = ehdr.e_machine,
