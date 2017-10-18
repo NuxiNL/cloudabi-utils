@@ -6,9 +6,7 @@
 #include "config.h"
 
 #include <sys/types.h>
-#if CONFIG_HAS_KQUEUE
-#include <sys/event.h>
-#endif
+
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #if CONFIG_HAS_PDFORK
@@ -481,10 +479,6 @@ static void fd_object_release(struct fd_object *fo) UNLOCKS(fo->refcount) {
           closedir(fo->directory.handle);
         }
         break;
-#if !CONFIG_HAS_KQUEUE
-      case CLOUDABI_FILETYPE_POLL:
-        break;
-#endif
 #if !CONFIG_HAS_PDFORK
       case CLOUDABI_FILETYPE_PROCESS:
         // Closing a process descriptor should lead to termination of
@@ -653,22 +647,6 @@ static cloudabi_errno_t sys_fd_close(cloudabi_fd_t fd) {
 static cloudabi_errno_t sys_fd_create1(cloudabi_filetype_t type,
                                        cloudabi_fd_t *fd) {
   switch (type) {
-    case CLOUDABI_FILETYPE_POLL: {
-#if CONFIG_HAS_KQUEUE
-      int nfd = kqueue();
-      if (nfd < 0)
-        return convert_errno(errno);
-      return fd_table_insert_fd(curfds, nfd, CLOUDABI_FILETYPE_POLL,
-                                RIGHTS_POLL_BASE, RIGHTS_POLL_INHERITING, fd);
-#else
-      struct fd_object *fo;
-      cloudabi_errno_t error = fd_object_new(CLOUDABI_FILETYPE_POLL, &fo);
-      if (error != 0)
-        return error;
-      return fd_table_insert(curfds, fo, RIGHTS_POLL_BASE,
-                             RIGHTS_POLL_INHERITING, fd);
-#endif
-    }
     case CLOUDABI_FILETYPE_SHARED_MEMORY: {
 #ifdef SHM_ANON
       int nfd = shm_open(SHM_ANON, O_RDWR, 0666);
@@ -1013,11 +991,6 @@ static cloudabi_errno_t sys_fd_stat_get(cloudabi_fd_t fd,
   // Fetch file descriptor flags.
   int ret;
   switch (fo->type) {
-#if !CONFIG_HAS_KQUEUE
-    case CLOUDABI_FILETYPE_POLL:
-      ret = 0;
-      break;
-#endif
 #if !CONFIG_HAS_PDFORK
     case CLOUDABI_FILETYPE_PROCESS:
       ret = 0;
@@ -1874,13 +1847,6 @@ static cloudabi_errno_t sys_file_stat_fget(cloudabi_fd_t fd,
 
   int ret;
   switch (fo->type) {
-#if !CONFIG_HAS_KQUEUE
-    case CLOUDABI_FILETYPE_POLL:
-      // TODO(ed): How can we fill in the other fields?
-      *buf = (cloudabi_filestat_t){.st_nlink = 1};
-      ret = 0;
-      break;
-#endif
 #if !CONFIG_HAS_PDFORK
     case CLOUDABI_FILETYPE_PROCESS:
       // TODO(ed): How can we fill in the other fields?
@@ -2645,16 +2611,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
   free(fos);
   free(pfds);
   return error;
-}
-
-static cloudabi_errno_t sys_poll_fd(cloudabi_fd_t fd,
-                                    const cloudabi_subscription_t *in,
-                                    size_t nin, cloudabi_event_t *out,
-                                    size_t nout,
-                                    const cloudabi_subscription_t *timeout,
-                                    size_t *nevents) {
-  fputs("Unimplemented poll_fd()\n", stderr);
-  return CLOUDABI_ENOSYS;
 }
 
 static cloudabi_errno_t sys_proc_exec(cloudabi_fd_t fd, const void *data,
