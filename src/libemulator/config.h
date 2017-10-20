@@ -36,10 +36,10 @@
 #define CONFIG_HAS_ISATTY 0
 #endif
 
-#if defined(__CloudABI__)
-#define CONFIG_HAS_PDFORK 1
+#ifndef __CloudABI__
+#define CONFIG_HAS_FORK 1
 #else
-#define CONFIG_HAS_PDFORK 0
+#define CONFIG_HAS_FORK 0
 #endif
 
 #ifndef __APPLE__

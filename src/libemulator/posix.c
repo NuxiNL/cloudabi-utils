@@ -9,16 +9,13 @@
 
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#if CONFIG_HAS_PDFORK
-#include <sys/procdesc.h>
-#endif
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
 #include <sys/un.h>
-#if !CONFIG_HAS_PDFORK
+#if CONFIG_HAS_FORK
 #include <sys/wait.h>
 #endif
 
@@ -254,7 +251,7 @@ struct fd_object {
   int number;
 
   union {
-#if !CONFIG_HAS_PDFORK
+#if CONFIG_HAS_FORK
     // Data associated with process descriptors.
     struct {
       pid_t pid;                     // Process ID of the child process.
@@ -427,12 +424,6 @@ static cloudabi_errno_t fd_determine_type_rights(
     *type = CLOUDABI_FILETYPE_SOCKET_STREAM;
     *rights_base = RIGHTS_SOCKET_BASE;
     *rights_inheriting = RIGHTS_SOCKET_INHERITING;
-#ifdef S_TYPEISPROC
-  } else if (S_TYPEISPROC(&sb)) {
-    *type = CLOUDABI_FILETYPE_PROCESS;
-    *rights_base = RIGHTS_PROCESS_BASE;
-    *rights_inheriting = RIGHTS_PROCESS_INHERITING;
-#endif
 #ifdef S_TYPEISSHM
   } else if (S_TYPEISSHM(&sb)) {
     *type = CLOUDABI_FILETYPE_SHARED_MEMORY;
@@ -479,7 +470,7 @@ static void fd_object_release(struct fd_object *fo) UNLOCKS(fo->refcount) {
           closedir(fo->directory.handle);
         }
         break;
-#if !CONFIG_HAS_PDFORK
+#if CONFIG_HAS_FORK
       case CLOUDABI_FILETYPE_PROCESS:
         // Closing a process descriptor should lead to termination of
         // the child process.
@@ -991,7 +982,7 @@ static cloudabi_errno_t sys_fd_stat_get(cloudabi_fd_t fd,
   // Fetch file descriptor flags.
   int ret;
   switch (fo->type) {
-#if !CONFIG_HAS_PDFORK
+#if CONFIG_HAS_FORK
     case CLOUDABI_FILETYPE_PROCESS:
       ret = 0;
       break;
@@ -1847,7 +1838,7 @@ static cloudabi_errno_t sys_file_stat_fget(cloudabi_fd_t fd,
 
   int ret;
   switch (fo->type) {
-#if !CONFIG_HAS_PDFORK
+#if CONFIG_HAS_FORK
     case CLOUDABI_FILETYPE_PROCESS:
       // TODO(ed): How can we fill in the other fields?
       *buf = (cloudabi_filestat_t){
@@ -2278,6 +2269,7 @@ static cloudabi_errno_t sys_mem_unmap(void *addr, size_t len) {
   return 0;
 }
 
+#if CONFIG_HAS_FORK
 // Converts a POSIX signal number to a CloudABI signal number.
 static cloudabi_signal_t convert_signal(int sig) {
   static const cloudabi_signal_t signals[] = {
@@ -2304,24 +2296,6 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
   if (error != 0)
     return error;
 
-#if CONFIG_HAS_PDFORK
-  siginfo_t si;
-  int ret = pdwait(fd_number(fo), &si, nohang ? WNOHANG : 0);
-  if (ret != 0 || si.si_signo != SIGCHLD) {
-    // Error or still running.
-    fd_object_release(fo);
-    return ret == 0 ? CLOUDABI_EAGAIN : convert_errno(ret);
-  }
-  if (si.si_code == CLD_EXITED) {
-    // Process has exited.
-    *signal = 0;
-    *exitcode = si.si_status;
-  } else {
-    // Process has terminated because of a signal.
-    *signal = convert_signal(si.si_status);
-    *exitcode = 0;
-  }
-#else
   // Wait on the process if termination info is not available yet.
   mutex_lock(&fo->process.lock);
   if (!fo->process.terminated) {
@@ -2347,11 +2321,11 @@ static cloudabi_errno_t do_pdwait(cloudabi_fd_t fd, bool nohang,
   *signal = fo->process.signal;
   *exitcode = fo->process.exitcode;
   mutex_unlock(&fo->process.lock);
-#endif
 
   fd_object_release(fo);
   return 0;
 }
+#endif
 
 static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
                                  cloudabi_event_t *out, size_t nsubscriptions,
@@ -2426,6 +2400,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     return 0;
   }
 
+#if CONFIG_HAS_FORK
   // Process event used by pdwait(): waiting on a process descriptor.
   if ((nsubscriptions == 1 &&
        in[0].type == CLOUDABI_EVENTTYPE_PROC_TERMINATE) ||
@@ -2452,6 +2427,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     *nevents = 1;
     return 0;
   }
+#endif
 
   // Last option: call into poll(). This can only be done in case all
   // subscriptions consist of CLOUDABI_EVENTTYPE_FD_READ and
@@ -2625,16 +2601,12 @@ static void sys_proc_exit(cloudabi_exitcode_t rval) {
 }
 
 static cloudabi_errno_t sys_proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
+#if CONFIG_HAS_FORK
   // Lock down the file descriptor table while forking, to ensure it's
   // consistent after forking.
   struct fd_table *ft = curfds;
   rwlock_wrlock(&ft->lock);
-#if CONFIG_HAS_PDFORK
-  int nfd;
-  int pid = pdfork(&nfd, 0);
-#else
   pid_t pid = fork();
-#endif
   rwlock_unlock(&ft->lock);
   if (pid < 0)
     return convert_errno(errno);
@@ -2650,12 +2622,6 @@ static cloudabi_errno_t sys_proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
     *tid = tidpool_allocate();
     return 0;
   } else {
-#if CONFIG_HAS_PDFORK
-    // Inside the parent process.
-    return fd_table_insert_fd(ft, nfd, CLOUDABI_FILETYPE_PROCESS,
-                              RIGHTS_PROCESS_BASE, RIGHTS_PROCESS_INHERITING,
-                              fd);
-#else
     struct fd_object *fo;
     cloudabi_errno_t error = fd_object_new(CLOUDABI_FILETYPE_PROCESS, &fo);
     if (error != 0) {
@@ -2668,8 +2634,10 @@ static cloudabi_errno_t sys_proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
     fo->process.pid = pid;
     return fd_table_insert(ft, fo, RIGHTS_PROCESS_BASE,
                            RIGHTS_PROCESS_INHERITING, fd);
-#endif
   }
+#else
+  return CLOUDABI_ENOSYS;
+#endif
 }
 
 static cloudabi_errno_t sys_proc_raise(cloudabi_signal_t sig) {
