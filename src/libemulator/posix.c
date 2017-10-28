@@ -2339,7 +2339,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     out[0] = (cloudabi_event_t){
         .userdata = in[0].userdata,
         .type = in[0].type,
-        .clock.identifier = in[0].clock.identifier,
     };
 #if CONFIG_HAS_CLOCK_NANOSLEEP
     clockid_t clock_id;
@@ -2420,8 +2419,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
       out[0] = (cloudabi_event_t){
           .userdata = in[1].userdata,
           .type = in[1].type,
-          .clock.identifier = in[1].clock.identifier,
-          .error = 0,
       };
     }
     *nevents = 1;
@@ -2473,7 +2470,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
               .userdata = s->userdata,
               .error = error,
               .type = s->type,
-              .fd_readwrite.fd = s->fd_readwrite.fd,
           };
         }
         break;
@@ -2523,7 +2519,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     out[(*nevents)++] = (cloudabi_event_t){
         .userdata = clock_subscription->userdata,
         .type = CLOUDABI_EVENTTYPE_CLOCK,
-        .clock.identifier = clock_subscription->clock.identifier,
     };
   } else {
     // Events got triggered. Don't trigger the clock event.
@@ -2549,7 +2544,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
               .error = CLOUDABI_EBADF,
 #endif
               .type = in[i].type,
-              .fd_readwrite.fd = in[i].fd_readwrite.fd,
           };
         } else if ((pfds[i].revents & POLLERR) != 0) {
           // File descriptor is in an error state.
@@ -2557,7 +2551,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
               .userdata = in[i].userdata,
               .error = CLOUDABI_EIO,
               .type = in[i].type,
-              .fd_readwrite.fd = in[i].fd_readwrite.fd,
           };
         } else if ((pfds[i].revents & POLLHUP) != 0) {
           // End-of-file.
@@ -2565,7 +2558,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
               .userdata = in[i].userdata,
               .type = in[i].type,
               .fd_readwrite.nbytes = nbytes,
-              .fd_readwrite.fd = in[i].fd_readwrite.fd,
               .fd_readwrite.flags = CLOUDABI_EVENT_FD_READWRITE_HANGUP,
           };
         } else if ((pfds[i].revents & (POLLRDNORM | POLLWRNORM)) != 0) {
@@ -2574,7 +2566,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
               .userdata = in[i].userdata,
               .type = in[i].type,
               .fd_readwrite.nbytes = nbytes,
-              .fd_readwrite.fd = in[i].fd_readwrite.fd,
           };
         }
       }

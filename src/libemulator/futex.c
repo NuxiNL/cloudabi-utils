@@ -686,17 +686,14 @@ bool futex_op_poll(cloudabi_tid_t tid, const cloudabi_subscription_t *in,
       out->error = futex_op_condvar_wait(
           tid, in[0].condvar.condvar, in[0].condvar.condvar_scope,
           in[0].condvar.lock, in[0].condvar.lock_scope, clock_id, timeout);
-      out->condvar.condvar = in[0].condvar.condvar;
       break;
     case CLOUDABI_EVENTTYPE_LOCK_RDLOCK:
       out->error = futex_op_lock_rdlock(
           tid, in[0].lock.lock, in[0].lock.lock_scope, clock_id, timeout);
-      out->lock.lock = in[0].lock.lock;
       break;
     case CLOUDABI_EVENTTYPE_LOCK_WRLOCK:
       out->error = futex_op_lock_wrlock(
           tid, in[0].lock.lock, in[0].lock.lock_scope, clock_id, timeout);
-      out->lock.lock = in[0].lock.lock;
       break;
     default:
       return false;
@@ -707,7 +704,6 @@ bool futex_op_poll(cloudabi_tid_t tid, const cloudabi_subscription_t *in,
     out->userdata = in[1].userdata;
     out->error = 0;
     out->type = in[1].type;
-    out->clock.identifier = in[1].clock.identifier;
   } else {
     out->userdata = in[0].userdata;
     out->type = in[0].type;
