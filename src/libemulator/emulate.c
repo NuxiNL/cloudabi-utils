@@ -238,6 +238,10 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
   // be passed to the executable.
   char canary[64];
   random_buf(canary, sizeof(canary));
+  char pid[16];
+  random_buf(pid, sizeof(pid));
+  pid[6] = (pid[6] & 0x0f) | 0x40;
+  pid[8] = (pid[8] & 0x3f) | 0x80;
   cloudabi_tid_t tid = tidpool_allocate();
   cloudabi_auxv_t auxv[] = {
       {.a_type = CLOUDABI_AT_ARGDATA, .a_ptr = (void *)argdata},
@@ -249,6 +253,7 @@ void emulate(int fd, const void *argdata, size_t argdatalen,
       {.a_type = CLOUDABI_AT_PAGESZ, .a_val = pagesize},
       {.a_type = CLOUDABI_AT_PHDR, .a_ptr = base + ehdr.e_phoff},
       {.a_type = CLOUDABI_AT_PHNUM, .a_val = ehdr.e_phnum},
+      {.a_type = CLOUDABI_AT_PID, .a_ptr = pid},
       {.a_type = CLOUDABI_AT_SYSINFO_EHDR, .a_ptr = &vdso},
       {.a_type = CLOUDABI_AT_TID, .a_val = tid},
       {.a_type = CLOUDABI_AT_NULL},
