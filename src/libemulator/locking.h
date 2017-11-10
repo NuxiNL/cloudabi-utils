@@ -99,26 +99,29 @@ static inline void rwlock_unlock(struct rwlock *lock)
 
 struct LOCKABLE cond {
   pthread_cond_t object;
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
+  bool monotonic;
+#endif
 };
 
-#if CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
-#define HAS_COND_INIT_MONOTONIC 1
-#else
-#define HAS_COND_INIT_MONOTONIC 0
-#endif
-
-#if HAS_COND_INIT_MONOTONIC
 static inline void cond_init_monotonic(struct cond *cond) {
+#if CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
   pthread_condattr_t attr;
   pthread_condattr_init(&attr);
   pthread_condattr_setclock(&attr, CLOCK_MONOTONIC);
   pthread_cond_init(&cond->object, &attr);
   pthread_condattr_destroy(&attr);
-}
+#else
+  pthread_cond_init(&cond->object, NULL);
+  cond->monotonic = true;
 #endif
+}
 
 static inline void cond_init_realtime(struct cond *cond) {
   pthread_cond_init(&cond->object, NULL);
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
+  cond->monotonic = false;
+#endif
 }
 
 static inline void cond_destroy(struct cond *cond) {
@@ -136,6 +139,32 @@ static inline bool cond_timedwait(struct cond *cond, struct mutex *lock,
       .tv_sec = (time_t)(timeout / 1000000000),
       .tv_nsec = (long)(timeout % 1000000000),
   };
+
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
+  // No native support for sleeping on monotonic clocks. Convert the
+  // timeout to a relative value and then to an absolute value for the
+  // realtime clock.
+  if (cond->monotonic) {
+    struct timespec ts_monotonic;
+    clock_gettime(CLOCK_MONOTONIC, &ts_monotonic);
+    ts.tv_sec -= ts_monotonic.tv_sec;
+    ts.tv_nsec -= ts_monotonic.tv_nsec;
+    if (ts.tv_nsec < 0) {
+      ts.tv_nsec += 1000000000;
+      --ts.tv_sec;
+    }
+
+    struct timespec ts_realtime;
+    clock_gettime(CLOCK_REALTIME, &ts_realtime);
+    ts.tv_sec += ts_realtime.tv_sec;
+    ts.tv_nsec += ts_realtime.tv_nsec;
+    if (ts.tv_nsec >= 1000000000) {
+      ts.tv_nsec -= 1000000000;
+      ++ts.tv_sec;
+    }
+  }
+#endif
+
   int ret = pthread_cond_timedwait(&cond->object, &lock->object, &ts);
   assert((ret == 0 || ret == ETIMEDOUT) && "pthread_cond_timedwait() failed");
   return ret == ETIMEDOUT;
