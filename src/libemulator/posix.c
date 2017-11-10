@@ -2407,7 +2407,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
     out[0] = (cloudabi_event_t){
         .userdata = in[0].userdata,
         .type = in[0].type,
-        .proc_terminate.fd = in[0].proc_terminate.fd,
     };
     out[0].error = do_pdwait(in[0].proc_terminate.fd, nsubscriptions == 2,
                              &out[0].proc_terminate.signal,
