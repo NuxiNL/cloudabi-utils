@@ -45,10 +45,6 @@
 #define RIGHTS_DIRECTORY_INHERITING \
   (RIGHTS_DIRECTORY_BASE | RIGHTS_REGULAR_FILE_BASE)
 
-#define RIGHTS_PROCESS_BASE \
-  (CLOUDABI_RIGHT_FILE_STAT_FGET | CLOUDABI_RIGHT_POLL_PROC_TERMINATE)
-#define RIGHTS_PROCESS_INHERITING 0
-
 // Operations that apply to regular files.
 #define RIGHTS_REGULAR_FILE_BASE                                               \
   (CLOUDABI_RIGHT_FD_DATASYNC | CLOUDABI_RIGHT_FD_READ |                       \

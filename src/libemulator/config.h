@@ -35,12 +35,6 @@
 #define CONFIG_HAS_ISATTY 0
 #endif
 
-#ifndef __CloudABI__
-#define CONFIG_HAS_FORK 1
-#else
-#define CONFIG_HAS_FORK 0
-#endif
-
 #ifndef __APPLE__
 #define CONFIG_HAS_POSIX_FALLOCATE 1
 #else
