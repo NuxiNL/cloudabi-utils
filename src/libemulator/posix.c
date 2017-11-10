@@ -2497,7 +2497,7 @@ static cloudabi_errno_t sys_sock_send(
         rwlock_unlock(&ft->lock);
         goto out;
       }
-      nfos = i;
+      nfos = i + 1;
       if (fos[i]->number < 0) {
         error = CLOUDABI_EBADF;
         rwlock_unlock(&ft->lock);
