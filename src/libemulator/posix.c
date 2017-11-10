@@ -1468,38 +1468,6 @@ static void path_put(struct path_access *pa) UNLOCKS(pa->fd_object->refcount) {
   fd_object_release(pa->fd_object);
 }
 
-#ifdef UTIME_NOW
-#define HAS_UTIMENS 1
-#else
-#define HAS_UTIMENS 0
-#endif
-
-#define HAS_CWD_LOCK !HAS_UTIMENS
-
-#if HAS_CWD_LOCK
-
-static struct mutex cwd_lock = MUTEX_INITIALIZER;
-
-// Switches to a new working directory while holding a global lock,
-// ensuring that no other system calls modify the working directory in
-// the meantime.
-static cloudabi_errno_t cwd_get(const struct path_access *pa)
-    TRYLOCKS_EXCLUSIVE(0, cwd_lock)
-        REQUIRES_EXCLUSIVE(pa->fd_object->refcount) {
-  mutex_lock(&cwd_lock);
-  if (fchdir(pa->fd) < 0) {
-    mutex_unlock(&cwd_lock);
-    return convert_errno(errno);
-  }
-  return 0;
-}
-
-static void cwd_put(void) UNLOCKS(cwd_lock) {
-  mutex_unlock(&cwd_lock);
-}
-
-#endif
-
 static cloudabi_errno_t sys_file_create(cloudabi_fd_t fd, const char *path,
                                         size_t pathlen,
                                         cloudabi_filetype_t type) {
@@ -1870,8 +1838,6 @@ static void convert_timestamp(cloudabi_timestamp_t in, struct timespec *out) {
   out->tv_sec = in < NUMERIC_MAX(time_t) ? in : NUMERIC_MAX(time_t);
 }
 
-#if HAS_UTIMENS
-
 // Converts the provided timestamps and flags to a set of arguments for
 // futimens() and utimensat().
 static void convert_utimens_arguments(const cloudabi_filestat_t *fs,
@@ -1893,60 +1859,6 @@ static void convert_utimens_arguments(const cloudabi_filestat_t *fs,
     ts[1].tv_nsec = UTIME_OMIT;
   }
 }
-
-#else
-
-// Converts the provided timestamps and flags to a set of arguments for
-// futimes(), lutimes() and utimes().
-static void convert_utimes_arguments(const cloudabi_filestat_t *fs,
-                                     cloudabi_fsflags_t flags,
-                                     struct timeval **tv, bool *need_atim,
-                                     bool *need_mtim) {
-  *need_atim = false;
-  *need_mtim = false;
-  cloudabi_fsflags_t nowflags =
-      flags & (CLOUDABI_FILESTAT_ATIM_NOW | CLOUDABI_FILESTAT_MTIM_NOW);
-  if (nowflags == (CLOUDABI_FILESTAT_ATIM_NOW | CLOUDABI_FILESTAT_MTIM_NOW)) {
-    // We can invoke futimes() with NULL to update both timestamps.
-    *tv = NULL;
-  } else {
-    struct timeval now;
-    if (nowflags != 0)
-      gettimeofday(&now, NULL);
-    if ((flags & CLOUDABI_FILESTAT_ATIM_NOW) != 0) {
-      (*tv)[0] = now;
-    } else if ((flags & CLOUDABI_FILESTAT_ATIM) != 0) {
-      (*tv)[0].tv_sec = fs->st_atim / 1000000000;
-      (*tv)[0].tv_usec = fs->st_atim % 1000000000 / 1000;
-    } else {
-      *need_atim = true;
-    }
-    if ((flags & CLOUDABI_FILESTAT_MTIM_NOW) != 0) {
-      (*tv)[1] = now;
-    } else if ((flags & CLOUDABI_FILESTAT_MTIM) != 0) {
-      (*tv)[1].tv_sec = fs->st_mtim / 1000000000;
-      (*tv)[1].tv_usec = fs->st_mtim % 1000000000 / 1000;
-    } else {
-      *need_mtim = true;
-    }
-  }
-}
-
-// Extracts timestamps from a stat structure and places them in the set
-// of arguments to be passed to futimes(), lutimes() and utimes().
-static void convert_utimes_stat(struct stat *sb, bool need_atim, bool need_mtim,
-                                struct timeval *tv) {
-  if (need_atim) {
-    tv[0].tv_sec = sb->st_atim.tv_sec;
-    tv[0].tv_usec = sb->st_atim.tv_nsec / 1000;
-  }
-  if (need_mtim) {
-    tv[1].tv_sec = sb->st_mtim.tv_sec;
-    tv[1].tv_usec = sb->st_mtim.tv_nsec / 1000;
-  }
-}
-
-#endif
 
 static cloudabi_errno_t sys_file_stat_fput(cloudabi_fd_t fd,
                                            const cloudabi_filestat_t *buf,
@@ -1980,26 +1892,10 @@ static cloudabi_errno_t sys_file_stat_fput(cloudabi_fd_t fd,
     if (error != 0)
       return error;
 
-#if HAS_UTIMENS
     struct timespec ts[2];
     convert_utimens_arguments(buf, flags, ts);
     int ret = futimens(fd_number(fo), ts);
-#else
-    struct timeval tv[2];
-    struct timeval *tvs = tv;
-    bool need_atim, need_mtim;
-    convert_utimes_arguments(buf, flags, &tvs, &need_atim, &need_mtim);
-    if (need_atim || need_mtim) {
-      // We need to preserve some of the original timestamps.
-      struct stat sb;
-      if (fstat(fd_number(fo), &sb) < 0) {
-        fd_object_release(fo);
-        return convert_errno(errno);
-      }
-      convert_utimes_stat(&sb, need_atim, need_mtim, tvs);
-    }
-    int ret = futimes(fd_number(fo), tvs);
-#endif
+
     fd_object_release(fo);
     if (ret < 0)
       return convert_errno(errno);
@@ -2057,32 +1953,10 @@ static cloudabi_errno_t sys_file_stat_put(cloudabi_lookup_t fd,
   if (error != 0)
     return error;
 
-#if HAS_UTIMENS
   struct timespec ts[2];
   convert_utimens_arguments(buf, flags, ts);
   int ret = utimensat(pa.fd, pa.path, ts, pa.follow ? 0 : AT_SYMLINK_NOFOLLOW);
-#else
-  struct timeval tv[2];
-  struct timeval *tvs = tv;
-  bool need_atim, need_mtim;
-  convert_utimes_arguments(buf, flags, &tvs, &need_atim, &need_mtim);
-  if (need_atim || need_mtim) {
-    // We need to preserve some of the original timestamps.
-    struct stat sb;
-    if (fstatat(pa.fd, pa.path, &sb, pa.follow ? 0 : AT_SYMLINK_NOFOLLOW) < 0) {
-      path_put(&pa);
-      return convert_errno(errno);
-    }
-    convert_utimes_stat(&sb, need_atim, need_mtim, tvs);
-  }
-  error = cwd_get(&pa);
-  if (error != 0) {
-    path_put(&pa);
-    return error;
-  }
-  int ret = (pa.follow ? utimes : lutimes)(pa.path, tvs);
-  cwd_put();
-#endif
+
   path_put(&pa);
   if (ret < 0)
     return convert_errno(errno);
@@ -2601,10 +2475,6 @@ static cloudabi_errno_t sys_proc_fork(cloudabi_fd_t *fd, cloudabi_tid_t *tid) {
     return convert_errno(errno);
 
   if (pid == 0) {
-#if HAS_CWD_LOCK
-    // Inside the child process.
-    mutex_init(&cwd_lock);
-#endif
     *fd = CLOUDABI_PROCESS_CHILD;
     tidpool_postfork();
     futex_postfork();
