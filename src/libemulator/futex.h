@@ -17,6 +17,5 @@ cloudabi_errno_t futex_op_lock_unlock(cloudabi_tid_t,
                                       cloudabi_scope_t);
 bool futex_op_poll(cloudabi_tid_t, const cloudabi_subscription_t *,
                    cloudabi_event_t *, size_t, size_t *);
-void futex_postfork(void);
 
 #endif

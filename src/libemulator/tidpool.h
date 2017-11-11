@@ -10,7 +10,4 @@
 // Allocates a new thread identifier.
 cloudabi_tid_t tidpool_allocate(void);
 
-// Should be invoked after forking, to reset the pool state.
-void tidpool_postfork(void);
-
 #endif

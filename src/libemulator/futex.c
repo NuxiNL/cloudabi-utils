@@ -708,13 +708,3 @@ bool futex_op_poll(cloudabi_tid_t tid, const cloudabi_subscription_t *in,
   *nevents = 1;
   return true;
 }
-
-// Reinitializes the global futex table after forking. After forking,
-// the entries in the table are no longer valid, as they apply to
-// threads in the parent process. Furthermore, the futex_global_lock may
-// have gone corrupt and needs to be reinitialized.
-void futex_postfork(void) {
-  mutex_init(&futex_global_lock);
-  LIST_INIT(&futex_lock_list);
-  LIST_INIT(&futex_condvar_list);
-}

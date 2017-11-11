@@ -16,7 +16,3 @@ cloudabi_tid_t tidpool_allocate(void) {
   // the lifetime of a single process? Some people do, I guess.
   return atomic_fetch_add_explicit(&tidpool, 1, memory_order_relaxed);
 }
-
-void tidpool_postfork(void) {
-  atomic_init(&tidpool, 2);
-}
