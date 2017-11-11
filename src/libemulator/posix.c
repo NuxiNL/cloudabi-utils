@@ -2332,7 +2332,6 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
 static cloudabi_errno_t sys_proc_exec(cloudabi_fd_t fd, const void *data,
                                       size_t datalen, const cloudabi_fd_t *fds,
                                       size_t fdslen) {
-  fputs("Unimplemented proc_exec()\n", stderr);
   return CLOUDABI_ENOSYS;
 }
 
