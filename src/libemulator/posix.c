@@ -2172,6 +2172,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
         break;
     }
 #endif
+    *nevents = 1;
     return 0;
   }
 
