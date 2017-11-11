@@ -13,7 +13,6 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/uio.h>
-#include <sys/un.h>
 
 #include <netinet/in.h>
 
