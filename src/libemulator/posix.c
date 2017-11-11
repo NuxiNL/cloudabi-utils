@@ -14,8 +14,6 @@
 #include <sys/time.h>
 #include <sys/uio.h>
 
-#include <netinet/in.h>
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
