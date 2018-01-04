@@ -2153,7 +2153,7 @@ static cloudabi_errno_t sys_poll(const cloudabi_subscription_t *in,
           struct cond cond;
           cond_init_realtime(&cond);
           mutex_lock(&mutex);
-          cond_timedwait(&cond, &mutex, in[0].clock.timeout);
+          cond_timedwait(&cond, &mutex, in[0].clock.timeout, true);
           mutex_unlock(&mutex);
           mutex_destroy(&mutex);
           cond_destroy(&cond);

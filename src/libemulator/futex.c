@@ -91,9 +91,11 @@ static unsigned int futex_queue_count(const struct futex_queue *)
 static void futex_queue_init(struct futex_queue *) REQUIRES_FUTEX_LOCK;
 static void futex_queue_requeue(struct futex_queue *, struct futex_queue *,
                                 unsigned int) REQUIRES_FUTEX_LOCK;
-static cloudabi_errno_t futex_queue_sleep(
-    struct futex_queue *, struct futex_lock *, cloudabi_tid_t,
-    cloudabi_clockid_t, cloudabi_timestamp_t) REQUIRES_FUTEX_LOCK;
+static cloudabi_errno_t futex_queue_sleep(struct futex_queue *,
+                                          struct futex_lock *, cloudabi_tid_t,
+                                          cloudabi_clockid_t,
+                                          cloudabi_timestamp_t,
+                                          bool) REQUIRES_FUTEX_LOCK;
 static cloudabi_tid_t futex_queue_tid_best(const struct futex_queue *)
     REQUIRES_FUTEX_LOCK;
 static void futex_queue_wake_up_all(struct futex_queue *) REQUIRES_FUTEX_LOCK;
@@ -232,15 +234,18 @@ static struct futex_lock *futex_lock_lookup_locked(_Atomic(cloudabi_lock_t) *
   return fl;
 }
 
-static cloudabi_errno_t futex_lock_rdlock(
-    struct futex_lock *fl, cloudabi_tid_t tid, cloudabi_clockid_t clock_id,
-    cloudabi_timestamp_t timeout) REQUIRES_FUTEX_LOCK {
+static cloudabi_errno_t futex_lock_rdlock(struct futex_lock *fl,
+                                          cloudabi_tid_t tid,
+                                          cloudabi_clockid_t clock_id,
+                                          cloudabi_timestamp_t timeout,
+                                          bool abstime) REQUIRES_FUTEX_LOCK {
   cloudabi_errno_t error = futex_lock_tryrdlock(fl);
   if (error == CLOUDABI_EBUSY) {
     // Suspend execution.
     assert(fl->fl_owner != LOCK_UNMANAGED &&
            "Attempted to sleep on an unmanaged lock");
-    error = futex_queue_sleep(&fl->fl_readers, fl, tid, clock_id, timeout);
+    error =
+        futex_queue_sleep(&fl->fl_readers, fl, tid, clock_id, timeout, abstime);
   }
   if (error != 0)
     futex_lock_unmanage(fl);
@@ -406,14 +411,17 @@ static void futex_lock_wake_up_next(struct futex_lock *fl) {
   }
 }
 
-static cloudabi_errno_t futex_lock_wrlock(
-    struct futex_lock *fl, cloudabi_tid_t tid, cloudabi_clockid_t clock_id,
-    cloudabi_timestamp_t timeout) REQUIRES_FUTEX_LOCK {
+static cloudabi_errno_t futex_lock_wrlock(struct futex_lock *fl,
+                                          cloudabi_tid_t tid,
+                                          cloudabi_clockid_t clock_id,
+                                          cloudabi_timestamp_t timeout,
+                                          bool abstime) REQUIRES_FUTEX_LOCK {
   cloudabi_errno_t error = futex_lock_trywrlock(fl, tid, false);
   if (error == CLOUDABI_EBUSY) {
     assert(fl->fl_owner != LOCK_UNMANAGED &&
            "Attempted to sleep on an unmanaged lock");
-    error = futex_queue_sleep(&fl->fl_writers, fl, tid, clock_id, timeout);
+    error =
+        futex_queue_sleep(&fl->fl_writers, fl, tid, clock_id, timeout, abstime);
   }
   if (error != 0)
     futex_lock_unmanage(fl);
@@ -435,11 +443,9 @@ static void futex_queue_init(struct futex_queue *fq) {
   fq->fq_count = 0;
 }
 
-static cloudabi_errno_t futex_queue_sleep(struct futex_queue *fq,
-                                          struct futex_lock *fl,
-                                          cloudabi_tid_t tid,
-                                          cloudabi_clockid_t clock_id,
-                                          cloudabi_timestamp_t timeout) {
+static cloudabi_errno_t futex_queue_sleep(
+    struct futex_queue *fq, struct futex_lock *fl, cloudabi_tid_t tid,
+    cloudabi_clockid_t clock_id, cloudabi_timestamp_t timeout, bool abstime) {
   // Initialize futex_waiter object.
   struct futex_waiter fw = {
       .fw_tid = tid,
@@ -464,7 +470,8 @@ static cloudabi_errno_t futex_queue_sleep(struct futex_queue *fq,
   futex_lock_assert(fl);
   bool timedout;
   do {
-    timedout = cond_timedwait(&fw.fw_wait, &futex_global_lock, timeout);
+    timedout =
+        cond_timedwait(&fw.fw_wait, &futex_global_lock, timeout, abstime);
   } while (!timedout && fw.fw_queue == fq);
   if (fw.fw_queue != fq) {
     while (fw.fw_queue != NULL)
@@ -531,7 +538,7 @@ static cloudabi_errno_t futex_op_condvar_wait(
     cloudabi_tid_t tid, _Atomic(cloudabi_condvar_t) * condvar,
     cloudabi_scope_t condvar_scope, _Atomic(cloudabi_lock_t) * lock,
     cloudabi_scope_t lock_scope, cloudabi_clockid_t clock_id,
-    cloudabi_timestamp_t timeout) {
+    cloudabi_timestamp_t timeout, bool abstime) {
   if (lock_scope != CLOUDABI_SCOPE_PRIVATE ||
       condvar_scope != CLOUDABI_SCOPE_PRIVATE)
     return CLOUDABI_ENOTSUP;
@@ -558,13 +565,13 @@ static cloudabi_errno_t futex_op_condvar_wait(
 
   // Go to sleep.
   ++fc->fc_waitcount;
-  error =
-      futex_queue_sleep(&fc->fc_waiters, fc->fc_lock, tid, clock_id, timeout);
+  error = futex_queue_sleep(&fc->fc_waiters, fc->fc_lock, tid, clock_id,
+                            timeout, abstime);
   if (error != 0) {
     // We observed a timeout. Reacquire the lock.
     futex_condvar_unmanage(fc);
     cloudabi_errno_t error2 =
-        futex_lock_wrlock(fl, tid, CLOUDABI_CLOCK_REALTIME, UINT64_MAX);
+        futex_lock_wrlock(fl, tid, CLOUDABI_CLOCK_REALTIME, UINT64_MAX, true);
     if (error2 != 0)
       error = error2;
   }
@@ -616,34 +623,32 @@ cloudabi_errno_t futex_op_condvar_signal(_Atomic(cloudabi_condvar_t) * condvar,
   return 0;
 }
 
-static cloudabi_errno_t futex_op_lock_rdlock(cloudabi_tid_t tid,
-                                             _Atomic(cloudabi_lock_t) * lock,
-                                             cloudabi_scope_t scope,
-                                             cloudabi_clockid_t clock_id,
-                                             cloudabi_timestamp_t timeout) {
+static cloudabi_errno_t futex_op_lock_rdlock(
+    cloudabi_tid_t tid, _Atomic(cloudabi_lock_t) * lock, cloudabi_scope_t scope,
+    cloudabi_clockid_t clock_id, cloudabi_timestamp_t timeout, bool abstime) {
   if (scope != CLOUDABI_SCOPE_PRIVATE)
     return CLOUDABI_ENOTSUP;
 
   struct futex_lock *fl;
   if (!futex_lock_lookup(lock, &fl))
     return CLOUDABI_ENOMEM;
-  cloudabi_errno_t error = futex_lock_rdlock(fl, tid, clock_id, timeout);
+  cloudabi_errno_t error =
+      futex_lock_rdlock(fl, tid, clock_id, timeout, abstime);
   futex_lock_release(fl);
   return error;
 }
 
-static cloudabi_errno_t futex_op_lock_wrlock(cloudabi_tid_t tid,
-                                             _Atomic(cloudabi_lock_t) * lock,
-                                             cloudabi_scope_t scope,
-                                             cloudabi_clockid_t clock_id,
-                                             cloudabi_timestamp_t timeout) {
+static cloudabi_errno_t futex_op_lock_wrlock(
+    cloudabi_tid_t tid, _Atomic(cloudabi_lock_t) * lock, cloudabi_scope_t scope,
+    cloudabi_clockid_t clock_id, cloudabi_timestamp_t timeout, bool abstime) {
   if (scope != CLOUDABI_SCOPE_PRIVATE)
     return CLOUDABI_ENOTSUP;
 
   struct futex_lock *fl;
   if (!futex_lock_lookup(lock, &fl))
     return CLOUDABI_ENOMEM;
-  cloudabi_errno_t error = futex_lock_wrlock(fl, tid, clock_id, timeout);
+  cloudabi_errno_t error =
+      futex_lock_wrlock(fl, tid, clock_id, timeout, abstime);
   futex_lock_release(fl);
   return error;
 }
@@ -668,8 +673,7 @@ bool futex_op_poll(cloudabi_tid_t tid, const cloudabi_subscription_t *in,
   // Intercept all calls to poll() that want to sleep on a futex, either
   // with or without a timeout.
   if (!(nsubscriptions == 1 ||
-        (nsubscriptions == 2 && in[1].type == CLOUDABI_EVENTTYPE_CLOCK &&
-         in[1].clock.flags == CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME)))
+        (nsubscriptions == 2 && in[1].type == CLOUDABI_EVENTTYPE_CLOCK)))
     return false;
 
   // Simply use a very high timeout value for waits without a timeout.
@@ -677,20 +681,25 @@ bool futex_op_poll(cloudabi_tid_t tid, const cloudabi_subscription_t *in,
       nsubscriptions == 1 ? CLOUDABI_CLOCK_REALTIME : in[1].clock.clock_id;
   cloudabi_timestamp_t timeout =
       nsubscriptions == 1 ? UINT64_MAX : in[1].clock.timeout;
+  bool abstime = nsubscriptions == 1 ||
+                 (in[1].clock.flags & CLOUDABI_SUBSCRIPTION_CLOCK_ABSTIME) != 0;
 
   switch (in[0].type) {
     case CLOUDABI_EVENTTYPE_CONDVAR:
       out->error = futex_op_condvar_wait(
           tid, in[0].condvar.condvar, in[0].condvar.condvar_scope,
-          in[0].condvar.lock, in[0].condvar.lock_scope, clock_id, timeout);
+          in[0].condvar.lock, in[0].condvar.lock_scope, clock_id, timeout,
+          abstime);
       break;
     case CLOUDABI_EVENTTYPE_LOCK_RDLOCK:
-      out->error = futex_op_lock_rdlock(
-          tid, in[0].lock.lock, in[0].lock.lock_scope, clock_id, timeout);
+      out->error =
+          futex_op_lock_rdlock(tid, in[0].lock.lock, in[0].lock.lock_scope,
+                               clock_id, timeout, abstime);
       break;
     case CLOUDABI_EVENTTYPE_LOCK_WRLOCK:
-      out->error = futex_op_lock_wrlock(
-          tid, in[0].lock.lock, in[0].lock.lock_scope, clock_id, timeout);
+      out->error =
+          futex_op_lock_wrlock(tid, in[0].lock.lock, in[0].lock.lock_scope,
+                               clock_id, timeout, abstime);
       break;
     default:
       return false;

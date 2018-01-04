@@ -47,6 +47,12 @@
 #define CONFIG_HAS_PREADV 0
 #endif
 
+#if defined(__APPLE__) || defined(__CloudABI__)
+#define CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP 1
+#else
+#define CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP 0
+#endif
+
 #ifndef __APPLE__
 #define CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK 1
 #else

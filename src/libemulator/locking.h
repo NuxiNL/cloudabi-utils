@@ -99,8 +99,9 @@ static inline void rwlock_unlock(struct rwlock *lock)
 
 struct LOCKABLE cond {
   pthread_cond_t object;
-#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
-  bool monotonic;
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK || \
+    !CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP
+  clockid_t clock;
 #endif
 };
 
@@ -113,14 +114,18 @@ static inline void cond_init_monotonic(struct cond *cond) {
   pthread_condattr_destroy(&attr);
 #else
   pthread_cond_init(&cond->object, NULL);
-  cond->monotonic = true;
+#endif
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK || \
+    !CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP
+  cond->clock = CLOCK_MONOTONIC;
 #endif
 }
 
 static inline void cond_init_realtime(struct cond *cond) {
   pthread_cond_init(&cond->object, NULL);
-#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
-  cond->monotonic = false;
+#if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK || \
+    !CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP
+  cond->clock = CLOCK_REALTIME;
 #endif
 }
 
@@ -133,37 +138,62 @@ static inline void cond_signal(struct cond *cond) {
 }
 
 static inline bool cond_timedwait(struct cond *cond, struct mutex *lock,
-                                  uint64_t timeout)
+                                  uint64_t timeout, bool abstime)
     REQUIRES_EXCLUSIVE(*lock) NO_LOCK_ANALYSIS {
   struct timespec ts = {
       .tv_sec = (time_t)(timeout / 1000000000),
       .tv_nsec = (long)(timeout % 1000000000),
   };
 
+  if (abstime) {
 #if !CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
-  // No native support for sleeping on monotonic clocks. Convert the
-  // timeout to a relative value and then to an absolute value for the
-  // realtime clock.
-  if (cond->monotonic) {
-    struct timespec ts_monotonic;
-    clock_gettime(CLOCK_MONOTONIC, &ts_monotonic);
-    ts.tv_sec -= ts_monotonic.tv_sec;
-    ts.tv_nsec -= ts_monotonic.tv_nsec;
-    if (ts.tv_nsec < 0) {
-      ts.tv_nsec += 1000000000;
-      --ts.tv_sec;
-    }
+    // No native support for sleeping on monotonic clocks. Convert the
+    // timeout to a relative value and then to an absolute value for the
+    // realtime clock.
+    if (cond->clock != CLOCK_REALTIME) {
+      struct timespec ts_monotonic;
+      clock_gettime(cond->clock, &ts_monotonic);
+      ts.tv_sec -= ts_monotonic.tv_sec;
+      ts.tv_nsec -= ts_monotonic.tv_nsec;
+      if (ts.tv_nsec < 0) {
+        ts.tv_nsec += 1000000000;
+        --ts.tv_sec;
+      }
 
-    struct timespec ts_realtime;
-    clock_gettime(CLOCK_REALTIME, &ts_realtime);
-    ts.tv_sec += ts_realtime.tv_sec;
-    ts.tv_nsec += ts_realtime.tv_nsec;
+      struct timespec ts_realtime;
+      clock_gettime(CLOCK_REALTIME, &ts_realtime);
+      ts.tv_sec += ts_realtime.tv_sec;
+      ts.tv_nsec += ts_realtime.tv_nsec;
+      if (ts.tv_nsec >= 1000000000) {
+        ts.tv_nsec -= 1000000000;
+        ++ts.tv_sec;
+      }
+    }
+#endif
+  } else {
+#if CONFIG_HAS_PTHREAD_COND_TIMEDWAIT_RELATIVE_NP
+    // Implementation supports relative timeouts.
+    int ret =
+        pthread_cond_timedwait_relative_np(&cond->object, &lock->object, &ts);
+    assert((ret == 0 || ret == ETIMEDOUT) &&
+           "pthread_cond_timedwait_relative_np() failed");
+    return ret == ETIMEDOUT;
+#else
+    // Convert to absolute timeout.
+    struct timespec ts_now;
+#if CONFIG_HAS_PTHREAD_CONDATTR_SETCLOCK
+    clock_gettime(cond->clock, &ts_now);
+#else
+    clock_gettime(CLOCK_REALTIME, &ts_now);
+#endif
+    ts.tv_sec += ts_now.tv_sec;
+    ts.tv_nsec += ts_now.tv_nsec;
     if (ts.tv_nsec >= 1000000000) {
       ts.tv_nsec -= 1000000000;
       ++ts.tv_sec;
     }
-  }
 #endif
+  }
 
   int ret = pthread_cond_timedwait(&cond->object, &lock->object, &ts);
   assert((ret == 0 || ret == ETIMEDOUT) && "pthread_cond_timedwait() failed");
