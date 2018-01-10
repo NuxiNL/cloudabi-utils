@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Nuxi, https://nuxi.nl/
+// Copyright (c) 2016-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -18,7 +18,6 @@
 #include <unistd.h>
 
 #include <cloudabi_syscalls_info.h>
-#include <cloudabi_syscalls_struct.h>
 #include <cloudabi_types.h>
 
 #include "elf.h"
@@ -54,7 +53,7 @@ static bool do_pread(int fd, void *buf, size_t len, off_t pos) {
 }
 
 void emulate(int fd, const void *argdata, size_t argdatalen,
-             const cloudabi_syscalls_t *syscalls) {
+             const struct syscalls *syscalls) {
   // Parse the ELF header.
   ElfW(Ehdr) ehdr;
   if (!do_pread(fd, &ehdr, sizeof(ehdr), 0))

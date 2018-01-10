@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Nuxi, https://nuxi.nl/
+// Copyright (c) 2016-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -31,8 +31,8 @@
 #include <unistd.h>
 
 #include <cloudabi_syscalls_info.h>
-#include <cloudabi_syscalls_struct.h>
 
+#include "emulate.h"
 #include "futex.h"
 #include "locking.h"
 #include "numeric_limits.h"
@@ -2642,7 +2642,7 @@ static cloudabi_errno_t sys_thread_yield(void) {
   return 0;
 }
 
-cloudabi_syscalls_t posix_syscalls = {
+struct syscalls posix_syscalls = {
 #define entry(name) .name = sys_##name,
     CLOUDABI_SYSCALL_NAMES(entry)
 #undef entry

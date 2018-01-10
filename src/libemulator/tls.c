@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Nuxi, https://nuxi.nl/
+// Copyright (c) 2016-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -8,8 +8,8 @@
 #include <stdbool.h>
 
 #include <cloudabi_syscalls_info.h>
-#include <cloudabi_syscalls_struct.h>
 
+#include "emulate.h"
 #include "tls.h"
 
 #if defined(__aarch64__)
@@ -101,7 +101,7 @@ static void tls_set(const void *tcb) {
 #error "Unsupported architecture"
 #endif
 
-void tls_init(struct tls *tls, const cloudabi_syscalls_t *forward) {
+void tls_init(struct tls *tls, const struct syscalls *forward) {
 #if defined(__x86_64__) && CONFIG_TLS_USE_GSBASE
   // On OS X there doesn't seem to be any way to modify the %fs base.
   // Let's use %gs instead. Install a signal handler for SIGSEGV to
@@ -147,7 +147,7 @@ void tls_init(struct tls *tls, const cloudabi_syscalls_t *forward) {
 CLOUDABI_SYSCALL_NAMES(wrapper)
 #undef wrapper
 
-cloudabi_syscalls_t tls_syscalls = {
+struct syscalls tls_syscalls = {
 #define entry(name) .name = name,
     CLOUDABI_SYSCALL_NAMES(entry)
 #undef entry

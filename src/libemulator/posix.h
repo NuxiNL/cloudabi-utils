@@ -1,4 +1,4 @@
-// Copyright (c) 2016 Nuxi, https://nuxi.nl/
+// Copyright (c) 2016-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -8,11 +8,10 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include <cloudabi_syscalls_struct.h>
-
 #include "locking.h"
 
 struct fd_entry;
+struct syscalls;
 
 struct fd_table {
   struct rwlock lock;
@@ -23,7 +22,7 @@ struct fd_table {
 
 extern _Thread_local cloudabi_tid_t curtid;
 
-extern cloudabi_syscalls_t posix_syscalls;
+extern struct syscalls posix_syscalls;
 
 void fd_table_init(struct fd_table *);
 bool fd_table_insert_existing(struct fd_table *, cloudabi_fd_t, int);
