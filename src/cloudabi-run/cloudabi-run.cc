@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2017 Nuxi, https://nuxi.nl/
+// Copyright (c) 2015-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -9,9 +9,9 @@
 // This data is converted to argument data (argdata_t) that can be
 // accessed from program_main().
 //
-// !fd, !file and !flower_switchboard_handle nodes in the YAML file are
-// converted to file descriptor entries in the argument data, meaning
-// they will be available within the CloudABI process.
+// !fd, !file, !executable and !flower_switchboard_handle nodes in the
+// YAML file are converted to file descriptor entries in the argument
+// data, meaning they will be available within the CloudABI process.
 
 #include <argdata.h>
 #include <fcntl.h>
@@ -71,9 +71,16 @@ int main(int argc, char *argv[]) {
   if (argc != 1)
     usage();
 
+  int execfd = open(argv[0], do_emulate ? O_RDONLY : O_EXEC);
+  if (execfd == -1) {
+    std::cerr << "Failed to open executable: " << std::strerror(errno)
+              << std::endl;
+    return 127;
+  }
+
   // Parse YAML configuration.
   YAMLErrorFactory<const argdata_t *> error_factory;
-  YAMLFileDescriptorFactory file_descriptor_factory(&error_factory);
+  YAMLFileDescriptorFactory file_descriptor_factory(&error_factory, execfd);
   YAMLArgdataFactory argdata_factory(&file_descriptor_factory);
   YAMLCanonicalizingFactory<const argdata_t *> canonicalizing_factory(
       &argdata_factory);
@@ -112,12 +119,6 @@ int main(int argc, char *argv[]) {
     // Call into the emulator to run the program inside of this process.
     // Throw a warning message before beginning execution, as emulation
     // is not considered secure.
-    int fd = open(argv[0], O_RDONLY);
-    if (fd == -1) {
-      std::cerr << "Failed to open executable: " << std::strerror(errno)
-                << std::endl;
-      return 127;
-    }
     std::cerr
         << "WARNING: Attempting to start executable using emulation.\n"
            "Keep in mind that this emulation provides no actual sandboxing.\n"
@@ -126,16 +127,10 @@ int main(int argc, char *argv[]) {
            "discouraged."
         << std::endl;
 
-    emulate(fd, buf.data(), buf.size(), &posix_syscalls);
+    emulate(execfd, buf.data(), buf.size(), &posix_syscalls);
   } else {
     // Execute the application directly through the operating system.
-    int fd = open(argv[0], O_EXEC);
-    if (fd == -1) {
-      std::cerr << "Failed to open executable: " << std::strerror(errno)
-                << std::endl;
-      return 127;
-    }
-    errno = program_exec(fd, ad);
+    errno = program_exec(execfd, ad);
   }
   std::cerr << "Failed to start executable: " << std::strerror(errno)
             << std::endl;
