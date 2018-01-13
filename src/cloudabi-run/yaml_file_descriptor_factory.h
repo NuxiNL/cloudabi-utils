@@ -18,7 +18,8 @@ namespace cloudabi_run {
 class YAMLFileDescriptorFactory
     : public yaml2argdata::YAMLFactory<const argdata_t *> {
  public:
-  YAMLFileDescriptorFactory(YAMLFactory<const argdata_t *> *fallback, int execfd)
+  YAMLFileDescriptorFactory(YAMLFactory<const argdata_t *> *fallback,
+                            int execfd)
       : fallback_(fallback), execfd_(execfd) {
   }
 
