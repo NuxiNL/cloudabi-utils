@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Nuxi, https://nuxi.nl/
+// Copyright (c) 2017-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -18,8 +18,8 @@ namespace cloudabi_run {
 class YAMLFileDescriptorFactory
     : public yaml2argdata::YAMLFactory<const argdata_t *> {
  public:
-  YAMLFileDescriptorFactory(YAMLFactory<const argdata_t *> *fallback)
-      : fallback_(fallback) {
+  YAMLFileDescriptorFactory(YAMLFactory<const argdata_t *> *fallback, int execfd)
+      : fallback_(fallback), execfd_(execfd) {
   }
 
   const argdata_t *GetNull(const YAML::Mark &mark) override;
@@ -34,6 +34,7 @@ class YAMLFileDescriptorFactory
 
  private:
   YAMLFactory<const argdata_t *> *const fallback_;
+  const int execfd_;
 
   std::vector<std::unique_ptr<argdata_t>> argdatas_;
   std::vector<std::shared_ptr<arpc::FileDescriptor>> fds_;

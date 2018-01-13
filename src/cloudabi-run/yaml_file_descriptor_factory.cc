@@ -1,4 +1,4 @@
-// Copyright (c) 2017 Nuxi, https://nuxi.nl/
+// Copyright (c) 2017-2018 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
@@ -55,6 +55,8 @@ const argdata_t *YAMLFileDescriptorFactory::GetScalar(const YAML::Mark &mark,
       throw YAML::ParserException(mark, "XXX!");
     }
     return argdatas_.emplace_back(argdata_t::create_fd(fd)).get();
+  } else if (tag == "tag:nuxi.nl,2015:cloudabi/executable") {
+    return argdatas_.emplace_back(argdata_t::create_fd(execfd_)).get();
   } else {
     return fallback_->GetScalar(mark, tag, value);
   }
