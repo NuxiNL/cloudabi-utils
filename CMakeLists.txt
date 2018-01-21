@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.2)
 project(cloudabi-utils)
 
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 11)
+
 include_directories("${PROJECT_SOURCE_DIR}/src/libcloudabi")
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "amd64")
