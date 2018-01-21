@@ -20,7 +20,11 @@ struct fd_table {
   size_t used;
 };
 
+// Only provide this in C mode, as _Thread_local may not be provided by
+// the compiler in C++ mode.
+#ifndef __cplusplus
 extern _Thread_local cloudabi_tid_t curtid;
+#endif
 
 extern struct syscalls posix_syscalls;
 
