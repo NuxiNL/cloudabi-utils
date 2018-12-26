@@ -1,0 +1,16 @@
+cc_binary(
+    name = "cloudabi-run",
+    srcs = [
+        "cloudabi-run.cc",
+        "yaml_file_descriptor_factory.cc",
+        "yaml_file_descriptor_factory.h",
+    ],
+    deps = [
+        "//src/libcloudabi",
+        "//src/libemulator",
+        "@com_github_nuxinl_argdata//:argdata",
+        "@com_github_nuxinl_arpc//:arpc",
+        "@com_github_nuxinl_flower//:flower_protocol",
+        "@com_github_nuxinl_yaml2argdata//:yaml2argdata",
+    ],
+)
