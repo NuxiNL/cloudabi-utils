@@ -1,3 +1,8 @@
+config_setting(
+    name = "linux",
+    constraint_values = ["@bazel_tools//platforms:linux"],
+)
+
 cc_library(
     name = "libemulator",
     srcs = [
@@ -27,6 +32,13 @@ cc_library(
         "emulate.h",
         "posix.h",
     ],
+    linkopts = select({
+        ":linux": [
+            "-lpthread",
+            "-lrt",
+        ],
+        "//conditions:default": ["-lpthread"],
+    }),
     visibility = ["//visibility:public"],
     deps = [
         "@com_github_nuxinl_cloudabi//headers:cloudabi_syscalls_info",
