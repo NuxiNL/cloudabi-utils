@@ -51,8 +51,16 @@ const argdata_t *YAMLFileDescriptorFactory::GetScalar(const YAML::Mark &mark,
     } else if (value == "stderr") {
       fd = STDERR_FILENO;
     } else {
-      // TODO(ed): Implement!
-      throw YAML::ParserException(mark, "XXX!");
+      // File descriptor number.
+      std::string value_str(value);
+      std::size_t len;
+      try {
+        fd = std::stoi(value_str, &len);
+      } catch (std::exception &e) {
+        throw YAML::ParserException(mark, "Invalid file descriptor number");
+      }
+      if (len != value_str.size())
+        throw YAML::ParserException(mark, "Invalid file descriptor number");
     }
     return argdatas_.emplace_back(argdata_t::create_fd(fd)).get();
   } else if (tag == "tag:nuxi.nl,2015:cloudabi/executable") {
