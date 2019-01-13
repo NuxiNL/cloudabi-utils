@@ -8,9 +8,9 @@ cc_binary(
     deps = [
         "//src/libcloudabi",
         "//src/libemulator",
-        "@com_github_nuxinl_argdata//:argdata",
-        "@com_github_nuxinl_arpc//:arpc",
-        "@com_github_nuxinl_flower//:flower_protocol",
-        "@com_github_nuxinl_yaml2argdata//:yaml2argdata",
+        "@org_cloudabi_argdata//:argdata",
+        "@org_cloudabi_arpc//:arpc",
+        "@org_cloudabi_flower//:flower_protocol",
+        "@org_cloudabi_yaml2argdata//:yaml2argdata",
     ],
 )

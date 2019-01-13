@@ -2,11 +2,7 @@ cc_library(
     name = "libcloudabi",
     srcs = ["program_exec.c"],
     hdrs = ["program.h"],
-    defines = [
-        # TODO(ed): How should this be configured?
-        "PATH_CLOUDABI_REEXEC=\\\"/usr/local/libexec/cloudabi-reexec\\\"",
-    ],
     include_prefix = ".",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_nuxinl_argdata//:argdata"],
+    deps = ["@org_cloudabi_argdata//:argdata"],
 )

@@ -41,7 +41,7 @@ cc_library(
     }),
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_nuxinl_cloudabi//headers:cloudabi_syscalls_info",
-        "@com_github_nuxinl_cloudabi//headers:cloudabi_types",
+        "@org_cloudabi_cloudabi//headers:cloudabi_syscalls_info",
+        "@org_cloudabi_cloudabi//headers:cloudabi_types",
     ],
 )

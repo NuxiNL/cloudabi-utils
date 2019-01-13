@@ -1,42 +1,44 @@
+workspace(name = "org_cloudabi_cloudabi_utils")
+
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 git_repository(
-    name = "com_github_nuxinl_argdata",
-    commit = "686bffe0e2dacf39c4bfe08a5f0d8f30c3237d2f",
+    name = "org_cloudabi_argdata",
+    commit = "191ab391fbe0be3edbee59bedd73165de9b3abf5",
     remote = "https://github.com/NuxiNL/argdata.git",
 )
 
 git_repository(
-    name = "com_github_nuxinl_arpc",
-    commit = "58e54234bb0e493b9d3aca5ddc5f1e216083588e",
+    name = "org_cloudabi_arpc",
+    commit = "81305e311c0559fe7a64a98ce8ac1aa7051c7a4d",
     remote = "https://github.com/NuxiNL/arpc.git",
 )
 
 git_repository(
-    name = "com_github_nuxinl_bazel_third_party",
-    commit = "1ea7fe04d7444391e388915ba24f1f9b204705ec",
+    name = "org_cloudabi_bazel_third_party",
+    commit = "8d51abda2299d5fe26ca7c55f182b6562f440979",
     remote = "https://github.com/NuxiNL/bazel-third-party.git",
 )
 
 git_repository(
-    name = "com_github_nuxinl_cloudabi",
-    commit = "2a847ede6a866844eca6d5c9b695ed6da0ae9c82",
+    name = "org_cloudabi_cloudabi",
+    commit = "af51ede669dbca0875d20893dae7f760b052b238",
     remote = "https://github.com/NuxiNL/cloudabi.git",
 )
 
 git_repository(
-    name = "com_github_nuxinl_flower",
-    commit = "2c9c423791a55c7ed68c687858bacc344eda5676",
+    name = "org_cloudabi_flower",
+    commit = "fac0e618f3ca566ac0ba07544496f388268c6316",
     remote = "https://github.com/NuxiNL/flower.git",
 )
 
 git_repository(
-    name = "com_github_nuxinl_yaml2argdata",
-    commit = "316b1acd4276d68a10782ff0fcd803f2867c38a7",
+    name = "org_cloudabi_yaml2argdata",
+    commit = "678be75c7a9bb23c80a8de4bbbccf26bba9570aa",
     remote = "https://github.com/NuxiNL/yaml2argdata.git",
 )
 
-load("@com_github_nuxinl_bazel_third_party//:third_party.bzl", "third_party_repositories")
+load("@org_cloudabi_bazel_third_party//:third_party.bzl", "third_party_repositories")
 
 third_party_repositories()
 
@@ -56,7 +58,7 @@ pip_repositories()
 
 pip_import(
     name = "aprotoc_deps",
-    requirements = "@com_github_nuxinl_arpc//scripts:requirements.txt",
+    requirements = "@org_cloudabi_arpc//scripts:requirements.txt",
 )
 
 load("@aprotoc_deps//:requirements.bzl", "pip_install")
