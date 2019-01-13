@@ -1,10 +1,11 @@
-// Copyright (c) 2015 Nuxi, https://nuxi.nl/
+// Copyright (c) 2015-2019 Nuxi, https://nuxi.nl/
 //
 // SPDX-License-Identifier: BSD-2-Clause
 
 #include <argdata.h>
 #include <errno.h>
 #include <program.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -55,6 +56,13 @@ int program_exec(int fd, const argdata_t *ad) {
   // function makes sure that no other file descriptors leak into the
   // sandboxed program. This also ensures that we're already in
   // capabilities mode before executing the program.
-  execve(PATH_CLOUDABI_REEXEC, argv, &envp);
+#ifdef PATH_CLOUDABI_REEXEC
+  const char *path_cloudabi_reexec = PATH_CLOUDABI_REEXEC;
+#else
+  const char *path_cloudabi_reexec = getenv("PATH_CLOUDABI_REEXEC");
+  if (path_cloudabi_reexec == NULL)
+    return ENOENT;
+#endif
+  execve(path_cloudabi_reexec, argv, &envp);
   return errno;
 }
