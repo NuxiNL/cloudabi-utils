@@ -1363,7 +1363,7 @@ static cloudabi_errno_t path_get(struct path_access *pa, cloudabi_lookup_t fd,
 
       // Finished expanding symlink. Continue processing along the
       // original path.
-      free(paths[curpath--]);
+      free(paths_start[curpath--]);
     }
     continue;
 
