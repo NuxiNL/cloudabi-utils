@@ -1647,7 +1647,7 @@ static cloudabi_errno_t sys_file_readdir(cloudabi_fd_t fd, void *buf,
   }
 
   *bufused = 0;
-  while (nbyte > 0) {
+  while (*bufused < nbyte) {
     // Read the next directory entry.
     errno = 0;
     struct dirent *de = readdir(dp);
